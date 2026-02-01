@@ -188,6 +188,9 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
   const [selectedNodes, setSelectedNodes] = useState<string[]>([]);
   const [isBackgroundContext, setIsBackgroundContext] = useState(false);
   const selectedNodesRef = useRef(selectedNodes);
+  
+  // Context menu target (set synchronously on right-click)
+  const contextTargetRef = useRef<string[]>([]);
 
   // Keep refs current
   dataRef.current = data;
@@ -198,7 +201,8 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
    * Handle context menu actions
    */
   const handleContextAction = useCallback((action: string, paths?: string[]) => {
-    const targetPaths = paths || selectedNodes;
+    // Use contextTargetRef (set at click time) to avoid React state timing issues
+    const targetPaths = paths || contextTargetRef.current;
     
     switch (action) {
       case 'open':
@@ -420,12 +424,18 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
       if (nodeId) {
         // Right-clicked on a node
         if (!selectedNodesRef.current.includes(nodeId)) {
+          // Clicking unselected node - select just this one
           network.selectNodes([nodeId]);
           setSelectedNodes([nodeId]);
+          contextTargetRef.current = [nodeId];
+        } else {
+          // Node already selected - use current selection
+          contextTargetRef.current = [...selectedNodesRef.current];
         }
         setIsBackgroundContext(false);
       } else {
         // Right-clicked on background
+        contextTargetRef.current = [];
         setIsBackgroundContext(true);
       }
     });
@@ -500,8 +510,11 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
     });
   }, [favorites, data.nodes]);
 
-  const isMultiSelect = selectedNodes.length > 1;
-  const allFavorited = selectedNodes.every(id => favorites.has(id));
+  // Use contextTargetRef for menu display (set synchronously on right-click)
+  // Fall back to selectedNodes if context target is empty
+  const menuTargets = contextTargetRef.current.length > 0 ? contextTargetRef.current : selectedNodes;
+  const isMultiSelect = menuTargets.length > 1;
+  const allFavorited = menuTargets.length > 0 && menuTargets.every(id => favorites.has(id));
 
   return (
     <ContextMenu>
@@ -534,7 +547,7 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
           // Node context menu
           <>
             <ContextMenuItem onClick={() => handleContextAction('open')}>
-              {isMultiSelect ? `Open ${selectedNodes.length} Files` : 'Open File'}
+              {isMultiSelect ? `Open ${menuTargets.length} Files` : 'Open File'}
             </ContextMenuItem>
             
             {!isMultiSelect && (
@@ -588,7 +601,7 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
               className="text-red-400 focus:text-red-300"
               onClick={() => handleContextAction('delete')}
             >
-              {isMultiSelect ? `Delete ${selectedNodes.length} Files` : 'Delete File'}
+              {isMultiSelect ? `Delete ${menuTargets.length} Files` : 'Delete File'}
             </ContextMenuItem>
           </>
         )}
