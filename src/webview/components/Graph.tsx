@@ -265,7 +265,7 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
         postMessage({ type: 'CREATE_FILE', payload: { directory: '.' } });
         break;
     }
-  }, [selectedNodes]);
+  }, []); // contextTargetRef is stable, no deps needed
 
   /**
    * Listen for commands from the extension
