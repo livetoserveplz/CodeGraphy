@@ -45,8 +45,10 @@ describe('Graph', () => {
   it('should apply correct container styles', () => {
     const { container } = render(<Graph data={mockData} />);
     const graphContainer = container.querySelector('div');
-    expect(graphContainer).toHaveClass('absolute', 'inset-0', 'rounded-lg', 'border', 'border-zinc-700', 'm-1');
+    expect(graphContainer).toHaveClass('absolute', 'inset-0', 'rounded-lg', 'm-1');
     expect(graphContainer).toHaveStyle({ backgroundColor: '#18181b' });
+    // Border is now inline style for theme support
+    expect(graphContainer).toHaveStyle({ borderWidth: '1px', borderStyle: 'solid' });
   });
 
   it('should initialize vis-network on mount', () => {

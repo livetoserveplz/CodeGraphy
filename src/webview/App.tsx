@@ -3,6 +3,7 @@ import Fuse from 'fuse.js';
 import Graph from './components/Graph';
 import GraphIcon from './components/GraphIcon';
 import { SearchBar } from './components/SearchBar';
+import { useTheme } from './hooks/useTheme';
 import { IGraphData, ExtensionToWebviewMessage, WebviewToExtensionMessage } from '../shared/types';
 
 // Get VSCode API if available (must be called exactly once at module level)
@@ -35,6 +36,7 @@ export default function App(): React.ReactElement {
   const [isLoading, setIsLoading] = useState(true);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
+  const theme = useTheme();
 
   // Create fuse instance for fuzzy search
   const fuse = useMemo(() => {
@@ -135,7 +137,7 @@ export default function App(): React.ReactElement {
       
       {/* Graph */}
       <div className="flex-1 relative">
-        <Graph data={filteredData || graphData} favorites={favorites} />
+        <Graph data={filteredData || graphData} favorites={favorites} theme={theme} />
       </div>
     </div>
   );

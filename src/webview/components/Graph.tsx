@@ -24,6 +24,7 @@ import {
   ContextMenuShortcut,
 } from './ui/context-menu';
 import { NodeTooltip } from './NodeTooltip';
+import { ThemeKind, adjustColorForLightTheme } from '../hooks/useTheme';
 
 // Get VSCode API (provided by the extension host)
 declare function acquireVsCodeApi(): {
@@ -42,6 +43,7 @@ interface GraphProps {
   data: IGraphData;
   favorites?: Set<string>;
   onFavoritesChange?: (favorites: Set<string>) => void;
+  theme?: ThemeKind;
 }
 
 /**
@@ -114,22 +116,30 @@ const NETWORK_OPTIONS: Options = {
 /**
  * Convert IGraphNode to Vis Network node format
  */
-function toVisNode(node: IGraphNode, isFavorite: boolean) {
-  const borderColor = isFavorite ? FAVORITE_BORDER_COLOR : node.color;
+function toVisNode(node: IGraphNode, isFavorite: boolean, theme: ThemeKind = 'dark') {
+  const isLight = theme === 'light';
+  const nodeColor = isLight ? adjustColorForLightTheme(node.color) : node.color;
+  const borderColor = isFavorite ? FAVORITE_BORDER_COLOR : nodeColor;
+  const textColor = isLight ? '#1e1e1e' : '#e2e8f0';
+  
   return {
     id: node.id,
     label: node.label,
     color: {
-      background: node.color,
+      background: nodeColor,
       border: borderColor,
       highlight: {
-        background: node.color,
-        border: isFavorite ? FAVORITE_BORDER_COLOR : '#ffffff',
+        background: nodeColor,
+        border: isFavorite ? FAVORITE_BORDER_COLOR : (isLight ? '#000000' : '#ffffff'),
       },
       hover: {
-        background: node.color,
-        border: isFavorite ? FAVORITE_BORDER_COLOR : '#94a3b8',
+        background: nodeColor,
+        border: isFavorite ? FAVORITE_BORDER_COLOR : (isLight ? '#64748b' : '#94a3b8'),
       },
+    },
+    font: {
+      color: textColor,
+      size: 12,
     },
     borderWidth: isFavorite ? 3 : 2,
     x: node.x,
@@ -177,7 +187,7 @@ function sendAllPositions(network: Network, nodeIds: string[]): void {
 /**
  * Graph component with context menu and multi-select support.
  */
-export default function Graph({ data, favorites = new Set() }: GraphProps): React.ReactElement {
+export default function Graph({ data, favorites = new Set(), theme = 'dark' }: GraphProps): React.ReactElement {
   const containerRef = useRef<HTMLDivElement>(null);
   const networkRef = useRef<Network | null>(null);
   const nodesRef = useRef<DataSet<ReturnType<typeof toVisNode>> | null>(null);
@@ -202,10 +212,13 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
   const tooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const fileInfoCacheRef = useRef<Map<string, IFileInfo>>(new Map());
 
+  const themeRef = useRef(theme);
+  
   // Keep refs current
   dataRef.current = data;
   favoritesRef.current = favorites;
   selectedNodesRef.current = selectedNodes;
+  themeRef.current = theme;
 
   /**
    * Handle context menu actions
@@ -396,7 +409,7 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
     const currentFavorites = favoritesRef.current;
 
     // Create datasets
-    const nodes = new DataSet(initialData.nodes.map(n => toVisNode(n, currentFavorites.has(n.id))));
+    const nodes = new DataSet(initialData.nodes.map(n => toVisNode(n, currentFavorites.has(n.id), themeRef.current)));
     const edges = new DataSet(initialData.edges.map(toVisEdge));
 
     nodesRef.current = nodes;
@@ -526,7 +539,7 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
     });
 
     data.nodes.forEach((node) => {
-      const visNode = toVisNode(node, currentFavorites.has(node.id));
+      const visNode = toVisNode(node, currentFavorites.has(node.id), themeRef.current);
       if (currentNodeIds.has(node.id)) {
         nodesRef.current?.update(visNode);
       } else {
@@ -560,10 +573,10 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
     if (!nodesRef.current) return;
     
     data.nodes.forEach((node) => {
-      const visNode = toVisNode(node, favorites.has(node.id));
+      const visNode = toVisNode(node, favorites.has(node.id), theme);
       nodesRef.current?.update(visNode);
     });
-  }, [favorites, data.nodes]);
+  }, [favorites, data.nodes, theme]);
 
   /**
    * Handle hover highlighting - dim unconnected nodes
@@ -589,28 +602,37 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
         }
       });
 
+      // Theme-aware colors
+      const isLight = themeRef.current === 'light';
+      const activeTextColor = isLight ? '#1e1e1e' : '#e2e8f0';
+      const dimTextColor = isLight ? '#9ca3af' : '#4a5568';
+      const highlightBorder = isLight ? '#000000' : '#ffffff';
+      const hoverBorder = isLight ? '#64748b' : '#94a3b8';
+      const dimEdgeColor = isLight ? '#d4d4d4' : '#2d3748';
+
       // Update node opacity
       data.nodes.forEach((node) => {
         const isConnected = connectedNodeIds.has(node.id);
         const isFavorite = favorites.has(node.id);
+        const nodeColor = isLight ? adjustColorForLightTheme(node.color) : node.color;
         
         nodesDataSet.update({
           id: node.id,
           opacity: isConnected ? 1.0 : 0.2,
           font: {
-            color: isConnected ? '#e2e8f0' : '#4a5568',
+            color: isConnected ? activeTextColor : dimTextColor,
             size: 12,
           },
           color: {
-            background: node.color,
-            border: isFavorite ? FAVORITE_BORDER_COLOR : node.color,
+            background: nodeColor,
+            border: isFavorite ? FAVORITE_BORDER_COLOR : nodeColor,
             highlight: {
-              background: node.color,
-              border: isFavorite ? FAVORITE_BORDER_COLOR : '#ffffff',
+              background: nodeColor,
+              border: isFavorite ? FAVORITE_BORDER_COLOR : highlightBorder,
             },
             hover: {
-              background: node.color,
-              border: isFavorite ? FAVORITE_BORDER_COLOR : '#94a3b8',
+              background: nodeColor,
+              border: isFavorite ? FAVORITE_BORDER_COLOR : hoverBorder,
             },
           },
         });
@@ -622,7 +644,7 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
         edgesDataSet.update({
           id: edge.id,
           color: {
-            color: isConnected ? '#60a5fa' : '#2d3748',
+            color: isConnected ? '#60a5fa' : dimEdgeColor,
             highlight: '#60a5fa',
             hover: '#60a5fa',
           },
@@ -631,12 +653,16 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
       });
     } else {
       // Reset all nodes and edges to normal
+      const isLight = themeRef.current === 'light';
+      const textColor = isLight ? '#1e1e1e' : '#e2e8f0';
+      const edgeColor = isLight ? '#94a3b8' : '#475569';
+      
       data.nodes.forEach((node) => {
-        const visNode = toVisNode(node, favorites.has(node.id));
+        const visNode = toVisNode(node, favorites.has(node.id), themeRef.current);
         nodesDataSet.update({
           ...visNode,
           opacity: 1.0,
-          font: { color: '#e2e8f0', size: 12 },
+          font: { color: textColor, size: 12 },
         });
       });
 
@@ -644,7 +670,7 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
         edgesDataSet.update({
           id: edge.id,
           color: {
-            color: '#475569',
+            color: edgeColor,
             highlight: '#60a5fa',
             hover: '#60a5fa',
           },
@@ -652,18 +678,22 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
         });
       });
     }
-  }, [hoveredNode, data, favorites]);
+  }, [hoveredNode, data, favorites, theme]);
 
   const isMultiSelect = selectedNodes.length > 1;
   const allFavorited = selectedNodes.every(id => favorites.has(id));
 
+  const isLight = theme === 'light';
+  const bgColor = isLight ? '#f5f5f5' : '#18181b';
+  const borderColor = isLight ? '#d4d4d4' : 'rgb(63, 63, 70)'; // zinc-700
+  
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <div
           ref={containerRef}
-          className="absolute inset-0 rounded-lg border border-zinc-700 m-1"
-          style={{ backgroundColor: '#18181b' }}
+          className="absolute inset-0 rounded-lg m-1"
+          style={{ backgroundColor: bgColor, borderWidth: 1, borderStyle: 'solid', borderColor }}
           tabIndex={0}
           onContextMenu={(e) => e.preventDefault()}
         />
