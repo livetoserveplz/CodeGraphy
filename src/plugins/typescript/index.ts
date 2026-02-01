@@ -56,6 +56,7 @@ export function createTypeScriptPlugin(): IPlugin {
       '.jsx': '#61DAFB',    // React cyan
       '.mjs': '#F7DF1E',    // JavaScript yellow
       '.cjs': '#F7DF1E',    // JavaScript yellow
+      '.vue': '#42B883',    // Vue green 💚
       
       // Config files
       'tsconfig.json': '#3178C6',     // TypeScript blue
@@ -81,6 +82,8 @@ export function createTypeScriptPlugin(): IPlugin {
       'webpack.config.js': '#8DD6F9', // Webpack blue
       'rollup.config.js': '#FF3333',  // Rollup red
       'esbuild.config.js': '#FFCF00', // esbuild yellow
+      'nuxt.config.ts': '#00DC82',    // Nuxt green
+      'nuxt.config.js': '#00DC82',
       
       // Testing
       'vitest.config.ts': '#729B1B',  // Vitest green
