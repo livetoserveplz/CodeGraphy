@@ -1,0 +1,5 @@
+{
+  "codegraphy.include": ["src/**/*.cs"],
+  "codegraphy.exclude": ["**/bin/**", "**/obj/**"],
+  "codegraphy.showOrphans": true
+}
