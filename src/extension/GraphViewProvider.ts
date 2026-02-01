@@ -347,7 +347,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
           break;
           
         case 'GET_FILE_INFO':
-          // TODO: Implement file info for tooltips
+          this._getFileInfo(message.payload.path);
           break;
       }
     });
@@ -530,6 +530,52 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
     const config = vscode.workspace.getConfiguration('codegraphy');
     const favorites = config.get<string[]>('favorites', []);
     this._sendMessage({ type: 'FAVORITES_UPDATED', payload: { favorites } });
+  }
+
+  /**
+   * Gets file info and sends it to the webview.
+   */
+  private async _getFileInfo(filePath: string): Promise<void> {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) return;
+
+    try {
+      const fileUri = vscode.Uri.joinPath(workspaceFolder.uri, filePath);
+      const stat = await vscode.workspace.fs.stat(fileUri);
+
+      // Count connections from graph data
+      let incomingCount = 0;
+      let outgoingCount = 0;
+      
+      for (const edge of this._graphData.edges) {
+        if (edge.to === filePath) incomingCount++;
+        if (edge.from === filePath) outgoingCount++;
+      }
+
+      // Get plugin name
+      let plugin: string | undefined;
+      if (this._analyzer) {
+        const registry = (this._analyzer as unknown as { _registry?: { getPluginForFile?: (path: string) => { plugin?: { name?: string } } | undefined } })._registry;
+        if (registry?.getPluginForFile) {
+          const pluginInfo = registry.getPluginForFile(filePath);
+          plugin = pluginInfo?.plugin?.name;
+        }
+      }
+
+      this._sendMessage({
+        type: 'FILE_INFO',
+        payload: {
+          path: filePath,
+          size: stat.size,
+          lastModified: stat.mtime,
+          incomingCount,
+          outgoingCount,
+          plugin,
+        },
+      });
+    } catch (error) {
+      console.error('[CodeGraphy] Failed to get file info:', error);
+    }
   }
 
   /**

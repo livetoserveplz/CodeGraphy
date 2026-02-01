@@ -11,6 +11,7 @@ import {
   IGraphData,
   IGraphNode,
   IGraphEdge,
+  IFileInfo,
   WebviewToExtensionMessage,
   ExtensionToWebviewMessage,
 } from '../../shared/types';
@@ -22,6 +23,7 @@ import {
   ContextMenuSeparator,
   ContextMenuShortcut,
 } from './ui/context-menu';
+import { NodeTooltip } from './NodeTooltip';
 
 // Get VSCode API (provided by the extension host)
 declare function acquireVsCodeApi(): {
@@ -189,6 +191,16 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
   const [isBackgroundContext, setIsBackgroundContext] = useState(false);
   const selectedNodesRef = useRef(selectedNodes);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
+  
+  // Tooltip state
+  const [tooltipData, setTooltipData] = useState<{
+    visible: boolean;
+    position: { x: number; y: number };
+    path: string;
+    info: IFileInfo | null;
+  }>({ visible: false, position: { x: 0, y: 0 }, path: '', info: null });
+  const tooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const fileInfoCacheRef = useRef<Map<string, IFileInfo>>(new Map());
 
   // Keep refs current
   dataRef.current = data;
@@ -289,6 +301,16 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
         }
         case 'FAVORITES_UPDATED':
           // Will be handled by parent component
+          break;
+        case 'FILE_INFO':
+          // Cache and update tooltip
+          fileInfoCacheRef.current.set(message.payload.path, message.payload);
+          setTooltipData(prev => {
+            if (prev.path === message.payload.path) {
+              return { ...prev, info: message.payload };
+            }
+            return prev;
+          });
           break;
       }
     };
@@ -432,13 +454,45 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
       }
     });
 
-    // Handle hover for highlighting connected nodes
+    // Handle hover for highlighting connected nodes and tooltips
     network.on('hoverNode', (params) => {
-      setHoveredNode(params.node as string);
+      const nodeId = params.node as string;
+      setHoveredNode(nodeId);
+      
+      // Show tooltip after delay
+      if (tooltipTimeoutRef.current) {
+        clearTimeout(tooltipTimeoutRef.current);
+      }
+      
+      tooltipTimeoutRef.current = setTimeout(() => {
+        const position = params.event.center || { x: params.event.clientX || 0, y: params.event.clientY || 0 };
+        
+        // Check cache first
+        const cached = fileInfoCacheRef.current.get(nodeId);
+        
+        setTooltipData({
+          visible: true,
+          position: { x: position.x, y: position.y },
+          path: nodeId,
+          info: cached || null,
+        });
+        
+        // Request file info if not cached
+        if (!cached) {
+          postMessage({ type: 'GET_FILE_INFO', payload: { path: nodeId } });
+        }
+      }, 500); // 500ms delay before showing tooltip
     });
 
     network.on('blurNode', () => {
       setHoveredNode(null);
+      
+      // Clear tooltip timeout and hide
+      if (tooltipTimeoutRef.current) {
+        clearTimeout(tooltipTimeoutRef.current);
+        tooltipTimeoutRef.current = null;
+      }
+      setTooltipData(prev => ({ ...prev, visible: false }));
     });
 
     // Notify extension that webview is ready
@@ -694,6 +748,18 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
           </>
         )}
       </ContextMenuContent>
+      
+      {/* Tooltip */}
+      <NodeTooltip
+        path={tooltipData.path}
+        size={tooltipData.info?.size}
+        lastModified={tooltipData.info?.lastModified}
+        incomingCount={tooltipData.info?.incomingCount ?? 0}
+        outgoingCount={tooltipData.info?.outgoingCount ?? 0}
+        plugin={tooltipData.info?.plugin}
+        position={tooltipData.position}
+        visible={tooltipData.visible}
+      />
     </ContextMenu>
   );
 }
