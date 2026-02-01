@@ -97,43 +97,77 @@ export class PathResolver {
 
   /**
    * Attempts convention-based resolution.
-   * Strips root namespace and converts to path.
+   * Tries multiple strategies to map namespace to file path:
+   * 1. With configured root namespace stripped
+   * 2. With first N parts stripped (auto-detect root namespace)
+   * 3. As full namespace path
    */
   private _conventionBasedResolve(namespace: string): string | null {
-    let parts = namespace.split('.');
+    const originalParts = namespace.split('.');
     
-    // Strip root namespace if configured
+    // Strategy 1: Strip configured root namespace
     if (this._config.rootNamespace) {
       const rootParts = this._config.rootNamespace.split('.');
-      if (parts.slice(0, rootParts.length).join('.') === this._config.rootNamespace) {
-        parts = parts.slice(rootParts.length);
+      if (originalParts.slice(0, rootParts.length).join('.') === this._config.rootNamespace) {
+        const strippedParts = originalParts.slice(rootParts.length);
+        const result = this._tryResolveParts(strippedParts);
+        if (result) return result;
       }
     }
     
+    // Strategy 2: Try stripping 0, 1, 2... parts to auto-detect root namespace
+    // e.g., MyApp.Services → try Services/, then MyApp/Services/
+    for (let stripCount = 0; stripCount < originalParts.length; stripCount++) {
+      const parts = originalParts.slice(stripCount);
+      if (parts.length === 0) continue;
+      
+      const result = this._tryResolveParts(parts);
+      if (result) return result;
+    }
+    
+    return null;
+  }
+
+  /**
+   * Tries to resolve namespace parts to a file path.
+   */
+  private _tryResolveParts(parts: string[]): string | null {
     if (parts.length === 0) return null;
     
     // Try each source directory
     for (const srcDir of this._config.sourceDirs || ['']) {
-      // Try as directory with matching .cs file
+      // Strategy A: Last part is a file name
       // e.g., Services.UserService → Services/UserService.cs
       const dirPath = parts.slice(0, -1).join('/');
       const fileName = parts[parts.length - 1] + '.cs';
-      const fullPath = srcDir ? path.join(srcDir, dirPath, fileName) : path.join(dirPath, fileName);
+      const filePath = srcDir ? path.join(srcDir, dirPath, fileName) : path.join(dirPath, fileName);
       
-      if (this._fileExists(fullPath)) {
-        return fullPath.replace(/\\/g, '/');
+      if (this._fileExists(filePath)) {
+        return filePath.replace(/\\/g, '/');
       }
       
-      // Try as namespace folder with any .cs files
+      // Strategy B: Namespace is a folder, find any .cs file
+      // e.g., Services → Services/*.cs
       const nsPath = parts.join('/');
       const asDir = srcDir ? path.join(srcDir, nsPath) : nsPath;
       
-      // Check for directory with .cs files
       if (this._directoryExists(asDir)) {
-        // Return the first .cs file in the directory
         const csFile = this._findCsFileInDir(asDir);
         if (csFile) {
           return csFile.replace(/\\/g, '/');
+        }
+      }
+      
+      // Strategy C: Try each part as a potential file
+      // e.g., MyApp.Utils → try Utils.cs in src/
+      if (parts.length >= 1) {
+        const lastPart = parts[parts.length - 1];
+        const simpleFile = srcDir 
+          ? path.join(srcDir, lastPart + '.cs') 
+          : lastPart + '.cs';
+        
+        if (this._fileExists(simpleFile)) {
+          return simpleFile.replace(/\\/g, '/');
         }
       }
     }

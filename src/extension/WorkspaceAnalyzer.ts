@@ -37,7 +37,7 @@ interface IAnalysisCache {
 }
 
 const CACHE_KEY = 'codegraphy.analysisCache';
-const CACHE_VERSION = '1.2.0'; // Bumped for C# plugin
+const CACHE_VERSION = '1.3.0'; // Bumped for C# PathResolver fix
 
 /**
  * Orchestrates workspace analysis.
