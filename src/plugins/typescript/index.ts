@@ -46,6 +46,16 @@ export function createTypeScriptPlugin(): IPlugin {
     name: 'TypeScript/JavaScript',
     version: '1.0.0',
     supportedExtensions: ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'],
+    
+    // Plugin-preferred colors for file extensions
+    fileColors: {
+      '.ts': '#93C5FD',    // Soft blue
+      '.tsx': '#67E8F9',   // Soft cyan
+      '.js': '#FDE68A',    // Soft yellow
+      '.jsx': '#FDBA74',   // Soft peach
+      '.mjs': '#FDE68A',   // Soft yellow (same as .js)
+      '.cjs': '#FDE68A',   // Soft yellow (same as .js)
+    },
 
     async initialize(workspaceRoot: string): Promise<void> {
       detector = new ImportDetector();
