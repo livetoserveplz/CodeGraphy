@@ -36,7 +36,7 @@ interface IAnalysisCache {
 }
 
 const CACHE_KEY = 'codegraphy.analysisCache';
-const CACHE_VERSION = '1.0.0';
+const CACHE_VERSION = '1.1.0'; // Bumped for Python plugin
 
 /**
  * Orchestrates workspace analysis.
