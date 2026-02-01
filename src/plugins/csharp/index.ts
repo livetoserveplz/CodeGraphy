@@ -45,7 +45,7 @@ export function createCSharpPlugin(): IPlugin {
     supportedExtensions: ['.cs'],
     
     // Default excludes for C# projects
-    defaultExcludes: [
+    defaultExclude: [
       'bin',
       'obj',
       '.vs',
