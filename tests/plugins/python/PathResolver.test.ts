@@ -59,6 +59,14 @@ describe('Python PathResolver', () => {
     };
   }
 
+  /**
+   * Helper to get expected absolute path (platform-independent comparison).
+   * PathResolver now returns absolute paths for consistency with TypeScript plugin.
+   */
+  function expectAbsPath(relativePath: string): string {
+    return path.join(workspaceRoot, relativePath);
+  }
+
   describe('absolute imports', () => {
     it('should resolve simple module to .py file', () => {
       addFile('utils.py');
@@ -66,7 +74,7 @@ describe('Python PathResolver', () => {
       const imp = createImport({ module: 'utils' });
       const resolved = resolver.resolve(imp, 'main.py');
       
-      expect(resolved).toBe('utils.py');
+      expect(resolved).toBe(expectAbsPath('utils.py'));
     });
 
     it('should resolve dotted module path', () => {
@@ -75,7 +83,7 @@ describe('Python PathResolver', () => {
       const imp = createImport({ module: 'mypackage.utils' });
       const resolved = resolver.resolve(imp, 'main.py');
       
-      expect(resolved).toBe('mypackage/utils.py');
+      expect(resolved).toBe(expectAbsPath('mypackage/utils.py'));
     });
 
     it('should resolve deeply nested module', () => {
@@ -84,7 +92,7 @@ describe('Python PathResolver', () => {
       const imp = createImport({ module: 'mypackage.subpackage.module' });
       const resolved = resolver.resolve(imp, 'main.py');
       
-      expect(resolved).toBe('mypackage/subpackage/module.py');
+      expect(resolved).toBe(expectAbsPath('mypackage/subpackage/module.py'));
     });
 
     it('should resolve package with __init__.py', () => {
@@ -93,7 +101,7 @@ describe('Python PathResolver', () => {
       const imp = createImport({ module: 'mypackage' });
       const resolved = resolver.resolve(imp, 'main.py');
       
-      expect(resolved).toBe('mypackage/__init__.py');
+      expect(resolved).toBe(expectAbsPath('mypackage/__init__.py'));
     });
 
     it('should prefer .py over __init__.py', () => {
@@ -103,7 +111,7 @@ describe('Python PathResolver', () => {
       const imp = createImport({ module: 'utils' });
       const resolved = resolver.resolve(imp, 'main.py');
       
-      expect(resolved).toBe('utils.py');
+      expect(resolved).toBe(expectAbsPath('utils.py'));
     });
 
     it('should try common source directories', () => {
@@ -112,7 +120,7 @@ describe('Python PathResolver', () => {
       const imp = createImport({ module: 'mymodule' });
       const resolved = resolver.resolve(imp, 'main.py');
       
-      expect(resolved).toBe('src/mymodule.py');
+      expect(resolved).toBe(expectAbsPath('src/mymodule.py'));
     });
 
     it('should return null for unresolved module', () => {
@@ -128,7 +136,7 @@ describe('Python PathResolver', () => {
       const imp = createImport({ module: 'types' });
       const resolved = resolver.resolve(imp, 'main.py');
       
-      expect(resolved).toBe('types.pyi');
+      expect(resolved).toBe(expectAbsPath('types.pyi'));
     });
   });
 
@@ -145,7 +153,7 @@ describe('Python PathResolver', () => {
       });
       const resolved = resolver.resolve(imp, 'package/main.py');
       
-      expect(resolved).toBe('package/utils.py');
+      expect(resolved).toBe(expectAbsPath('package/utils.py'));
     });
 
     it('should resolve double dot import', () => {
@@ -161,7 +169,7 @@ describe('Python PathResolver', () => {
       });
       const resolved = resolver.resolve(imp, 'package/subpackage/main.py');
       
-      expect(resolved).toBe('package/helpers.py');
+      expect(resolved).toBe(expectAbsPath('package/helpers.py'));
     });
 
     it('should resolve parent package import', () => {
@@ -176,7 +184,7 @@ describe('Python PathResolver', () => {
       });
       const resolved = resolver.resolve(imp, 'package/main.py');
       
-      expect(resolved).toBe('config.py');
+      expect(resolved).toBe(expectAbsPath('config.py'));
     });
 
     it('should resolve relative import with nested module', () => {
@@ -191,7 +199,7 @@ describe('Python PathResolver', () => {
       });
       const resolved = resolver.resolve(imp, 'package/main.py');
       
-      expect(resolved).toBe('package/utils/helpers.py');
+      expect(resolved).toBe(expectAbsPath('package/utils/helpers.py'));
     });
 
     it('should resolve from . import (same directory)', () => {
@@ -206,7 +214,7 @@ describe('Python PathResolver', () => {
       });
       const resolved = resolver.resolve(imp, 'package/current.py');
       
-      expect(resolved).toBe('package/sibling.py');
+      expect(resolved).toBe(expectAbsPath('package/sibling.py'));
     });
 
     it('should resolve package __init__ for relative import', () => {
@@ -221,7 +229,7 @@ describe('Python PathResolver', () => {
       });
       const resolved = resolver.resolve(imp, 'package/main.py');
       
-      expect(resolved).toBe('package/subpackage/__init__.py');
+      expect(resolved).toBe(expectAbsPath('package/subpackage/__init__.py'));
     });
   });
 
@@ -232,7 +240,7 @@ describe('Python PathResolver', () => {
       const imp = createImport({ module: 'utils' });
       const resolved = resolver.resolve(imp, '/workspace/main.py');
       
-      expect(resolved).toBe('utils.py');
+      expect(resolved).toBe(expectAbsPath('utils.py'));
     });
 
     it('should handle Windows-style paths', () => {
@@ -241,7 +249,7 @@ describe('Python PathResolver', () => {
       const imp = createImport({ module: 'mypackage.utils' });
       const resolved = resolver.resolve(imp, 'src\\main.py');
       
-      expect(resolved).toBe('mypackage/utils.py');
+      expect(resolved).toBe(expectAbsPath('mypackage/utils.py'));
     });
 
     it('should handle empty module in relative import', () => {
@@ -258,7 +266,7 @@ describe('Python PathResolver', () => {
       const resolved = resolver.resolve(imp, 'package/subpackage/main.py');
       
       // Should resolve to the parent package's __init__.py
-      expect(resolved).toBe('package/__init__.py');
+      expect(resolved).toBe(expectAbsPath('package/__init__.py'));
     });
   });
 
@@ -273,7 +281,7 @@ describe('Python PathResolver', () => {
       const imp = createImport({ module: 'external' });
       const resolved = resolverWithRoots.resolve(imp, 'main.py');
       
-      expect(resolved).toBe('lib/external.py');
+      expect(resolved).toBe(expectAbsPath('lib/external.py'));
     });
   });
 });

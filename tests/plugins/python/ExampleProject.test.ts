@@ -22,9 +22,13 @@ describe('Python Example Project', () => {
     return detector.detect(content);
   }
 
-  // Helper to resolve import from a file
+  // Helper to resolve import from a file and return the workspace-relative path
+  // (for easier test comparison)
   function resolveImport(imp: ReturnType<typeof detector.detect>[0], fromFile: string) {
-    return resolver.resolve(imp, fromFile);
+    const absolutePath = resolver.resolve(imp, fromFile);
+    if (absolutePath === null) return null;
+    // Convert absolute path to workspace-relative for comparison
+    return path.relative(EXAMPLE_ROOT, absolutePath).replace(/\\/g, '/');
   }
 
   describe('main.py imports', () => {

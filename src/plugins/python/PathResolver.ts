@@ -133,6 +133,9 @@ export class PathResolver {
   /**
    * Resolves a module path to an actual file.
    * Tries: path.py, path/__init__.py
+   * 
+   * Returns ABSOLUTE paths for consistency with other plugins
+   * (WorkspaceAnalyzer expects absolute paths).
    */
   private _resolveModulePath(modulePath: string): string | null {
     // Normalize the path
@@ -141,21 +144,21 @@ export class PathResolver {
     // Try direct .py file
     const pyFile = `${normalized}.py`;
     if (this._fileExists(pyFile)) {
-      return pyFile;
+      return path.join(this._workspaceRoot, pyFile);
     }
 
     // Try __init__.py in package directory
     if (this._config.resolveInitFiles) {
       const initFile = path.join(normalized, '__init__.py').replace(/\\/g, '/');
       if (this._fileExists(initFile)) {
-        return initFile;
+        return path.join(this._workspaceRoot, initFile);
       }
     }
 
     // Try .pyi stub file (for type stubs)
     const pyiFile = `${normalized}.pyi`;
     if (this._fileExists(pyiFile)) {
-      return pyiFile;
+      return path.join(this._workspaceRoot, pyiFile);
     }
 
     return null;
