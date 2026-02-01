@@ -5,6 +5,7 @@
  */
 
 import distinctColors from 'distinct-colors';
+import { minimatch } from 'minimatch';
 
 /**
  * Color source priority levels (highest to lowest).
@@ -48,27 +49,38 @@ export const DEFAULT_FALLBACK_COLOR = '#A1A1AA'; // Soft zinc
  * 2. Plugin colors - Plugins can declare colors for their supported extensions
  * 3. Runtime generated - Auto-generate distinct colors for remaining extensions
  * 
+ * User colors support multiple formats:
+ * - Extensions: `.ts`, `.md`
+ * - Exact filenames: `.gitignore`, `Makefile`, `Dockerfile`
+ * - Glob patterns: `*.test.ts` (with double star prefix for recursive)
+ * 
  * @example
  * ```typescript
  * const manager = new ColorPaletteManager();
  * 
- * // Add plugin colors
+ * // Add plugin colors (extensions only)
  * manager.setPluginColors({ '.gd': '#A5B4FC', '.tscn': '#6EE7B7' });
  * 
- * // Add user overrides
- * manager.setUserColors({ '.ts': '#3B82F6' });
+ * // Add user overrides (extensions, filenames, or patterns)
+ * manager.setUserColors({
+ *   '.ts': '#3B82F6',       // Extension
+ *   '.gitignore': '#6B7280' // Exact filename
+ * });
  * 
  * // Generate palette for discovered extensions
  * manager.generateForExtensions(['.ts', '.js', '.gd', '.json', '.md']);
  * 
- * // Get color for a file
- * const color = manager.getColor('.ts'); // Returns '#3B82F6' (user override)
+ * // Get color for a file path
+ * const color = manager.getColorForFile('src/utils.test.ts');
  * ```
  */
 export class ColorPaletteManager {
   private generatedColors: Map<string, string> = new Map();
   private pluginColors: Map<string, string> = new Map();
-  private userColors: Map<string, string> = new Map();
+  /** User extension colors (normalized, e.g., '.ts') */
+  private userExtensionColors: Map<string, string> = new Map();
+  /** User pattern colors (raw patterns, e.g., 'Makefile', '.gitignore') */
+  private userPatternColors: Map<string, string> = new Map();
   private generationOptions: IColorGenerationOptions;
 
   constructor(options: IColorGenerationOptions = {}) {
@@ -110,14 +122,50 @@ export class ColorPaletteManager {
    * Set user-defined colors.
    * These have highest priority and override all other colors.
    * 
-   * @param colors - Map of extension to hex color
+   * Supports:
+   * - Extensions: `.ts`, `.md` (start with dot, no path separators)
+   * - Exact filenames: `.gitignore`, `Makefile` (no path separators)
+   * - Glob patterns: Patterns with `*` or `/` for matching paths
+   * 
+   * @param colors - Map of pattern/extension to hex color
    */
   setUserColors(colors: Record<string, string>): void {
-    this.userColors.clear();
-    for (const [ext, color] of Object.entries(colors)) {
-      const normalizedExt = this.normalizeExtension(ext);
-      this.userColors.set(normalizedExt, color);
+    this.userExtensionColors.clear();
+    this.userPatternColors.clear();
+    
+    for (const [pattern, color] of Object.entries(colors)) {
+      if (this.isExtension(pattern)) {
+        // Simple extension like '.ts', '.md'
+        const normalizedExt = this.normalizeExtension(pattern);
+        this.userExtensionColors.set(normalizedExt, color);
+      } else {
+        // Pattern or filename like '.gitignore', '**/*.test.ts', 'Makefile'
+        this.userPatternColors.set(pattern, color);
+      }
     }
+  }
+  
+  /**
+   * Check if a pattern is a simple extension (e.g., '.ts', 'ts')
+   * vs a filename/pattern (e.g., '.gitignore', glob patterns)
+   */
+  private isExtension(pattern: string): boolean {
+    // Contains glob characters or path separators = pattern
+    if (pattern.includes('*') || pattern.includes('/') || pattern.includes('\\')) {
+      return false;
+    }
+    // Starts with dot and has more characters after = could be extension OR dotfile
+    if (pattern.startsWith('.') && pattern.length > 1) {
+      // If it has no other dots, it's likely a dotfile like .gitignore
+      // If the part after the first dot is short (1-4 chars), it's likely an extension
+      const afterDot = pattern.slice(1);
+      if (!afterDot.includes('.') && afterDot.length <= 4) {
+        return true; // .ts, .tsx, .js, .md, etc.
+      }
+      return false; // .gitignore, .eslintrc, etc.
+    }
+    // No dot = likely a filename like 'Makefile'
+    return false;
   }
 
   /**
@@ -153,8 +201,39 @@ export class ColorPaletteManager {
   }
 
   /**
+   * Get the color for a file by its path.
+   * Checks user patterns/filenames first, then extension-based colors.
+   * 
+   * @param filePath - Workspace-relative file path (e.g., 'src/utils.ts', '.gitignore')
+   * @returns Hex color string
+   */
+  getColorForFile(filePath: string): string {
+    // Normalize path separators for matching
+    const normalizedPath = filePath.replace(/\\/g, '/');
+    const fileName = normalizedPath.split('/').pop() || normalizedPath;
+    
+    // Priority 1: User patterns (most specific)
+    for (const [pattern, color] of this.userPatternColors) {
+      // Check exact filename match first
+      if (pattern === fileName) {
+        return color;
+      }
+      // Then try glob pattern
+      if (minimatch(normalizedPath, pattern, { dot: true })) {
+        return color;
+      }
+    }
+    
+    // Fall back to extension-based color
+    const ext = this.getExtension(normalizedPath);
+    return this.getColor(ext);
+  }
+
+  /**
    * Get the color for a file extension.
-   * Checks user colors first, then plugin colors, then generated colors.
+   * Checks user extension colors, then plugin colors, then generated colors.
+   * 
+   * For full path matching (including patterns and filenames), use getColorForFile().
    * 
    * @param extension - File extension (with or without leading dot)
    * @returns Hex color string
@@ -162,8 +241,8 @@ export class ColorPaletteManager {
   getColor(extension: string): string {
     const normalizedExt = this.normalizeExtension(extension);
     
-    // Priority 1: User colors
-    const userColor = this.userColors.get(normalizedExt);
+    // Priority 1: User extension colors
+    const userColor = this.userExtensionColors.get(normalizedExt);
     if (userColor) {
       return userColor;
     }
@@ -183,9 +262,43 @@ export class ColorPaletteManager {
     // Fallback
     return DEFAULT_FALLBACK_COLOR;
   }
+  
+  /**
+   * Extract extension from a file path.
+   */
+  private getExtension(filePath: string): string {
+    const fileName = filePath.split('/').pop() || filePath;
+    const lastDot = fileName.lastIndexOf('.');
+    if (lastDot > 0) { // > 0 to exclude dotfiles like .gitignore
+      return fileName.slice(lastDot);
+    }
+    return '';
+  }
 
   /**
-   * Get color info including the source.
+   * Get color info for a file path, including the source.
+   * 
+   * @param filePath - Workspace-relative file path
+   * @returns Color info with source
+   */
+  getColorInfoForFile(filePath: string): IColorInfo {
+    const normalizedPath = filePath.replace(/\\/g, '/');
+    const fileName = normalizedPath.split('/').pop() || normalizedPath;
+    
+    // Check user patterns
+    for (const [pattern, color] of this.userPatternColors) {
+      if (pattern === fileName || minimatch(normalizedPath, pattern, { dot: true })) {
+        return { color, source: 'user' };
+      }
+    }
+    
+    // Fall back to extension
+    const ext = this.getExtension(normalizedPath);
+    return this.getColorInfo(ext);
+  }
+
+  /**
+   * Get color info for an extension, including the source.
    * 
    * @param extension - File extension (with or without leading dot)
    * @returns Color info with source
@@ -193,7 +306,7 @@ export class ColorPaletteManager {
   getColorInfo(extension: string): IColorInfo {
     const normalizedExt = this.normalizeExtension(extension);
     
-    const userColor = this.userColors.get(normalizedExt);
+    const userColor = this.userExtensionColors.get(normalizedExt);
     if (userColor) {
       return { color: userColor, source: 'user' };
     }
@@ -212,10 +325,10 @@ export class ColorPaletteManager {
   }
 
   /**
-   * Get the full color map (all extensions to colors).
+   * Get the full color map (extensions and patterns to colors).
    * Useful for sending to webview.
    * 
-   * @returns Record of extension to hex color
+   * @returns Record of extension/pattern to hex color
    */
   getColorMap(): Record<string, string> {
     const map: Record<string, string> = {};
@@ -230,9 +343,14 @@ export class ColorPaletteManager {
       map[ext] = color;
     }
     
-    // Override with user colors
-    for (const [ext, color] of this.userColors) {
+    // Override with user extension colors
+    for (const [ext, color] of this.userExtensionColors) {
       map[ext] = color;
+    }
+    
+    // Add user pattern colors (these need file path to resolve)
+    for (const [pattern, color] of this.userPatternColors) {
+      map[pattern] = color;
     }
     
     return map;
@@ -244,7 +362,8 @@ export class ColorPaletteManager {
   clear(): void {
     this.generatedColors.clear();
     this.pluginColors.clear();
-    this.userColors.clear();
+    this.userExtensionColors.clear();
+    this.userPatternColors.clear();
   }
 
   /**

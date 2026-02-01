@@ -251,8 +251,7 @@ export class WorkspaceAnalyzer {
         continue;
       }
 
-      const ext = path.extname(filePath).toLowerCase();
-      const color = this._colorPalette.getColor(ext);
+      const color = this._colorPalette.getColorForFile(filePath);
 
       nodes.push({
         id: filePath,

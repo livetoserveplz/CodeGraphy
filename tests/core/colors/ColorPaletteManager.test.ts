@@ -220,4 +220,94 @@ describe('ColorPaletteManager', () => {
       expect(customManager.getColor('.ts')).not.toBe(DEFAULT_FALLBACK_COLOR);
     });
   });
+
+  describe('getColorForFile', () => {
+    it('should match exact filename', () => {
+      manager.setUserColors({ '.gitignore': '#6B7280' });
+      
+      expect(manager.getColorForFile('.gitignore')).toBe('#6B7280');
+      expect(manager.getColorForFile('src/.gitignore')).toBe('#6B7280');
+    });
+
+    it('should match Makefile (no extension)', () => {
+      manager.setUserColors({ 'Makefile': '#FF5733' });
+      
+      expect(manager.getColorForFile('Makefile')).toBe('#FF5733');
+      expect(manager.getColorForFile('src/Makefile')).toBe('#FF5733');
+    });
+
+    it('should match Dockerfile', () => {
+      manager.setUserColors({ 'Dockerfile': '#2496ED' });
+      
+      expect(manager.getColorForFile('Dockerfile')).toBe('#2496ED');
+      expect(manager.getColorForFile('docker/Dockerfile')).toBe('#2496ED');
+    });
+
+    it('should match glob pattern **/*.test.ts', () => {
+      manager.setUserColors({ '**/*.test.ts': '#10B981' });
+      
+      expect(manager.getColorForFile('utils.test.ts')).toBe('#10B981');
+      expect(manager.getColorForFile('src/utils.test.ts')).toBe('#10B981');
+      expect(manager.getColorForFile('src/lib/deep/utils.test.ts')).toBe('#10B981');
+    });
+
+    it('should match scoped glob pattern', () => {
+      manager.setUserColors({ 'src/**/*.ts': '#3B82F6' });
+      manager.generateForExtensions(['.ts']);
+      
+      expect(manager.getColorForFile('src/utils.ts')).toBe('#3B82F6');
+      expect(manager.getColorForFile('src/lib/utils.ts')).toBe('#3B82F6');
+      // Files outside src/ should use extension color
+      expect(manager.getColorForFile('tests/utils.ts')).not.toBe('#3B82F6');
+    });
+
+    it('should fall back to extension color when no pattern matches', () => {
+      manager.generateForExtensions(['.ts']);
+      manager.setUserColors({ '.gitignore': '#6B7280' });
+      
+      const tsColor = manager.getColor('.ts');
+      expect(manager.getColorForFile('src/utils.ts')).toBe(tsColor);
+    });
+
+    it('should prioritize patterns over extensions', () => {
+      manager.generateForExtensions(['.ts']);
+      manager.setUserColors({ 
+        '.ts': '#FF0000',
+        '**/*.test.ts': '#00FF00' 
+      });
+      
+      expect(manager.getColorForFile('utils.ts')).toBe('#FF0000');
+      expect(manager.getColorForFile('utils.test.ts')).toBe('#00FF00');
+    });
+
+    it('should handle dotfiles like .eslintrc', () => {
+      manager.setUserColors({ '.eslintrc': '#4B32C3' });
+      
+      expect(manager.getColorForFile('.eslintrc')).toBe('#4B32C3');
+    });
+
+    it('should handle Windows-style paths', () => {
+      manager.setUserColors({ '**/*.test.ts': '#10B981' });
+      
+      // Backslashes should be normalized
+      expect(manager.getColorForFile('src\\utils.test.ts')).toBe('#10B981');
+    });
+  });
+
+  describe('getColorInfoForFile', () => {
+    it('should return user source for pattern matches', () => {
+      manager.setUserColors({ '.gitignore': '#6B7280' });
+      
+      const info = manager.getColorInfoForFile('.gitignore');
+      expect(info.source).toBe('user');
+      expect(info.color).toBe('#6B7280');
+    });
+
+    it('should return generated source for extension fallback', () => {
+      manager.generateForExtensions(['.ts']);
+      
+      const info = manager.getColorInfoForFile('utils.ts');
+      expect(info.source).toBe('generated');
+    });
+  });
 });

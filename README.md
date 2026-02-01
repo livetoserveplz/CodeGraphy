@@ -52,17 +52,20 @@ Configure CodeGraphy in your workspace settings (`.vscode/settings.json`):
 
 ### Custom Colors
 
-Colors are assigned automatically, but you can override any file extension:
+Colors are assigned automatically, but you can override any file type:
 
 ```json
 {
   "codegraphy.fileColors": {
     ".ts": "#3B82F6",
-    ".gd": "#A5B4FC",
-    ".vue": "#42B883"
+    ".gitignore": "#6B7280",
+    "Makefile": "#F97316",
+    "**/*.test.ts": "#10B981"
   }
 }
 ```
+
+Supports extensions (`.ts`), exact filenames (`.gitignore`, `Makefile`), and glob patterns (`**/*.test.ts`).
 
 Color priority: **User settings** > **Plugin defaults** > **Auto-generated**
 

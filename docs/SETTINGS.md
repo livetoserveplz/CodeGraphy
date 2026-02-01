@@ -140,17 +140,27 @@ Currently, only built-in plugins are supported. External plugin loading is plann
 
 ### `codegraphy.fileColors`
 
-Customize the colors used for file extensions in the graph.
+Customize the colors used for files in the graph.
 
 ```json
 {
   "codegraphy.fileColors": {
     ".ts": "#3B82F6",
-    ".vue": "#42B883",
-    ".gd": "#A5B4FC"
+    ".gitignore": "#6B7280",
+    "Makefile": "#F97316",
+    "**/*.test.ts": "#10B981"
   }
 }
 ```
+
+**Supported patterns:**
+
+| Pattern | Example | Matches |
+|---------|---------|---------|
+| Extension | `.ts`, `.md` | All files with that extension |
+| Exact filename | `.gitignore`, `Makefile` | Files with that exact name |
+| Glob pattern | `**/*.test.ts` | Files matching the glob |
+| Scoped glob | `src/**/*.ts` | Files in specific directories |
 
 **How colors work:**
 
@@ -175,9 +185,9 @@ CodeGraphy uses a dynamic color system with three priority levels:
   "codegraphy.fileColors": {
     ".ts": "#3178C6",
     ".js": "#F7DF1E",
-    ".py": "#3776AB",
-    ".go": "#00ADD8",
-    ".rs": "#DEA584"
+    ".gitignore": "#6B7280",
+    "Dockerfile": "#2496ED",
+    "**/*.test.ts": "#10B981"
   }
 }
 ```
