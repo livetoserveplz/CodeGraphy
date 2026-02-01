@@ -12,6 +12,7 @@ CodeGraphy provides several settings to customize its behavior. Configure these 
 | `codegraphy.respectGitignore` | boolean | `true` | Honor .gitignore patterns |
 | `codegraphy.showOrphans` | boolean | `true` | Show files with no connections |
 | `codegraphy.plugins` | string[] | `[]` | Paths to external plugins |
+| `codegraphy.fileColors` | object | `{}` | Custom colors for file extensions |
 
 ## Detailed Documentation
 
@@ -136,6 +137,50 @@ Paths to external plugin files (for future use).
 ```
 
 Currently, only built-in plugins are supported. External plugin loading is planned for a future release.
+
+### `codegraphy.fileColors`
+
+Customize the colors used for file extensions in the graph.
+
+```json
+{
+  "codegraphy.fileColors": {
+    ".ts": "#3B82F6",
+    ".vue": "#42B883",
+    ".gd": "#A5B4FC"
+  }
+}
+```
+
+**How colors work:**
+
+CodeGraphy uses a dynamic color system with three priority levels:
+
+1. **User settings** (highest) — Colors defined in `codegraphy.fileColors`
+2. **Plugin defaults** — Colors declared by language plugins
+3. **Auto-generated** (lowest) — Distinct colors generated automatically
+
+**Auto-generation:**
+- When your project has file types without predefined colors, CodeGraphy generates distinct colors automatically
+- Colors are deterministic — the same file extensions always get the same colors
+- Uses the [iwanthue](https://medialab.github.io/iwanthue/) algorithm for perceptually distinct colors
+
+**Color format:**
+- Use 6-digit hex colors: `#RRGGBB`
+- Example: `"#FF5733"` (coral), `"#3B82F6"` (blue)
+
+**Example — Matching your IDE theme:**
+```json
+{
+  "codegraphy.fileColors": {
+    ".ts": "#3178C6",
+    ".js": "#F7DF1E",
+    ".py": "#3776AB",
+    ".go": "#00ADD8",
+    ".rs": "#DEA584"
+  }
+}
+```
 
 ## Example Configurations
 
