@@ -187,10 +187,12 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
   // Selection state
   const [selectedNodes, setSelectedNodes] = useState<string[]>([]);
   const [isBackgroundContext, setIsBackgroundContext] = useState(false);
+  const selectedNodesRef = useRef(selectedNodes);
 
   // Keep refs current
   dataRef.current = data;
   favoritesRef.current = favorites;
+  selectedNodesRef.current = selectedNodes;
 
   /**
    * Handle context menu actions
@@ -418,7 +420,7 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
       
       if (nodeId) {
         // Right-clicked on a node
-        if (!selectedNodes.includes(nodeId)) {
+        if (!selectedNodesRef.current.includes(nodeId)) {
           network.selectNodes([nodeId]);
           setSelectedNodes([nodeId]);
         }
