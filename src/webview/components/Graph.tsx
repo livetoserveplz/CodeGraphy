@@ -413,9 +413,8 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
       }
     });
 
-    // Handle right-click for context menu
+    // Handle right-click for context menu (set state only, let Radix handle the event)
     network.on('oncontext', (params) => {
-      params.event.preventDefault();
       const nodeId = network.getNodeAt(params.pointer.DOM) as string | undefined;
       
       if (nodeId) {
@@ -512,7 +511,6 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
           className="absolute inset-0 rounded-lg border border-zinc-700 m-1"
           style={{ backgroundColor: '#18181b' }}
           tabIndex={0}
-          onContextMenu={(e) => e.preventDefault()}
         />
       </ContextMenuTrigger>
       
