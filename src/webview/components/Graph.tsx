@@ -188,6 +188,7 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
   const [selectedNodes, setSelectedNodes] = useState<string[]>([]);
   const [isBackgroundContext, setIsBackgroundContext] = useState(false);
   const selectedNodesRef = useRef(selectedNodes);
+  const [hoveredNode, setHoveredNode] = useState<string | null>(null);
 
   // Keep refs current
   dataRef.current = data;
@@ -431,6 +432,15 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
       }
     });
 
+    // Handle hover for highlighting connected nodes
+    network.on('hoverNode', (params) => {
+      setHoveredNode(params.node as string);
+    });
+
+    network.on('blurNode', () => {
+      setHoveredNode(null);
+    });
+
     // Notify extension that webview is ready
     postMessage({ type: 'WEBVIEW_READY', payload: null });
 
@@ -500,6 +510,95 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
       nodesRef.current?.update(visNode);
     });
   }, [favorites, data.nodes]);
+
+  /**
+   * Handle hover highlighting - dim unconnected nodes
+   */
+  useEffect(() => {
+    if (!nodesRef.current || !edgesRef.current) return;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const nodesDataSet = nodesRef.current as any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const edgesDataSet = edgesRef.current as any;
+
+    if (hoveredNode) {
+      // Find connected nodes
+      const connectedNodeIds = new Set<string>([hoveredNode]);
+      
+      data.edges.forEach((edge) => {
+        if (edge.from === hoveredNode) {
+          connectedNodeIds.add(edge.to);
+        }
+        if (edge.to === hoveredNode) {
+          connectedNodeIds.add(edge.from);
+        }
+      });
+
+      // Update node opacity
+      data.nodes.forEach((node) => {
+        const isConnected = connectedNodeIds.has(node.id);
+        const isFavorite = favorites.has(node.id);
+        
+        nodesDataSet.update({
+          id: node.id,
+          opacity: isConnected ? 1.0 : 0.2,
+          font: {
+            color: isConnected ? '#e2e8f0' : '#4a5568',
+            size: 12,
+          },
+          color: {
+            background: node.color,
+            border: isFavorite ? FAVORITE_BORDER_COLOR : node.color,
+            highlight: {
+              background: node.color,
+              border: isFavorite ? FAVORITE_BORDER_COLOR : '#ffffff',
+            },
+            hover: {
+              background: node.color,
+              border: isFavorite ? FAVORITE_BORDER_COLOR : '#94a3b8',
+            },
+          },
+        });
+      });
+
+      // Update edge opacity
+      data.edges.forEach((edge) => {
+        const isConnected = edge.from === hoveredNode || edge.to === hoveredNode;
+        edgesDataSet.update({
+          id: edge.id,
+          color: {
+            color: isConnected ? '#60a5fa' : '#2d3748',
+            highlight: '#60a5fa',
+            hover: '#60a5fa',
+          },
+          width: isConnected ? 2 : 1,
+        });
+      });
+    } else {
+      // Reset all nodes and edges to normal
+      data.nodes.forEach((node) => {
+        const visNode = toVisNode(node, favorites.has(node.id));
+        nodesDataSet.update({
+          ...visNode,
+          opacity: 1.0,
+          font: { color: '#e2e8f0', size: 12 },
+        });
+      });
+
+      data.edges.forEach((edge) => {
+        edgesDataSet.update({
+          id: edge.id,
+          color: {
+            color: '#475569',
+            highlight: '#60a5fa',
+            hover: '#60a5fa',
+          },
+          width: 1,
+        });
+      });
+    }
+  }, [hoveredNode, data, favorites]);
 
   const isMultiSelect = selectedNodes.length > 1;
   const allFavorited = selectedNodes.every(id => favorites.has(id));
