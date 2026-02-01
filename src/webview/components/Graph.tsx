@@ -419,6 +419,17 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
 
     // Handle right-click for context menu (set state only, let Radix handle the event)
     network.on('oncontext', (params) => {
+      // On Mac, Ctrl+click triggers context menu. Skip selection change if this is
+      // a Ctrl+click attempt at multi-select (let vis-network handle it naturally).
+      const event = params.event as MouseEvent | undefined;
+      if (event && event.ctrlKey && !event.metaKey) {
+        // Ctrl+click on Mac - don't interfere with multi-select
+        // Just set context target from current selection
+        contextTargetRef.current = [...selectedNodesRef.current];
+        setIsBackgroundContext(selectedNodesRef.current.length === 0);
+        return;
+      }
+
       const nodeId = network.getNodeAt(params.pointer.DOM) as string | undefined;
       
       if (nodeId) {

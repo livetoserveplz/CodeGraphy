@@ -478,6 +478,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
       prompt: 'Enter new file name',
       value: oldName,
       valueSelection: [0, oldName.lastIndexOf('.') > 0 ? oldName.lastIndexOf('.') : oldName.length],
+      ignoreFocusOut: true, // Prevent dialog from closing on mouse move or focus loss
     });
 
     if (!newName || newName === oldName) return;
@@ -504,6 +505,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
     const fileName = await vscode.window.showInputBox({
       prompt: 'Enter file name',
       placeHolder: 'newfile.ts',
+      ignoreFocusOut: true, // Prevent dialog from closing on mouse move or focus loss
     });
 
     if (fileName) {
