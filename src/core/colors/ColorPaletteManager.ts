@@ -76,7 +76,10 @@ export const DEFAULT_FALLBACK_COLOR = '#A1A1AA'; // Soft zinc
  */
 export class ColorPaletteManager {
   private generatedColors: Map<string, string> = new Map();
-  private pluginColors: Map<string, string> = new Map();
+  /** Plugin extension colors (normalized, e.g., '.ts') */
+  private pluginExtensionColors: Map<string, string> = new Map();
+  /** Plugin pattern colors (raw patterns, e.g., 'Makefile', '.gitignore') */
+  private pluginPatternColors: Map<string, string> = new Map();
   /** User extension colors (normalized, e.g., '.ts') */
   private userExtensionColors: Map<string, string> = new Map();
   /** User pattern colors (raw patterns, e.g., 'Makefile', '.gitignore') */
@@ -96,25 +99,40 @@ export class ColorPaletteManager {
    * Set plugin-defined colors.
    * These override generated colors but are overridden by user colors.
    * 
-   * @param colors - Map of extension to hex color
+   * Supports same formats as user colors:
+   * - Extensions: `.ts`, `.md`
+   * - Exact filenames: `.gitignore`, `Makefile`
+   * - Glob patterns: Patterns with `*` or `/`
+   * 
+   * @param colors - Map of pattern/extension to hex color
    */
   setPluginColors(colors: Record<string, string>): void {
-    this.pluginColors.clear();
-    for (const [ext, color] of Object.entries(colors)) {
-      const normalizedExt = this.normalizeExtension(ext);
-      this.pluginColors.set(normalizedExt, color);
+    this.pluginExtensionColors.clear();
+    this.pluginPatternColors.clear();
+    
+    for (const [pattern, color] of Object.entries(colors)) {
+      if (this.isExtension(pattern)) {
+        const normalizedExt = this.normalizeExtension(pattern);
+        this.pluginExtensionColors.set(normalizedExt, color);
+      } else {
+        this.pluginPatternColors.set(pattern, color);
+      }
     }
   }
 
   /**
    * Add plugin colors (merges with existing).
    * 
-   * @param colors - Map of extension to hex color
+   * @param colors - Map of pattern/extension to hex color
    */
   addPluginColors(colors: Record<string, string>): void {
-    for (const [ext, color] of Object.entries(colors)) {
-      const normalizedExt = this.normalizeExtension(ext);
-      this.pluginColors.set(normalizedExt, color);
+    for (const [pattern, color] of Object.entries(colors)) {
+      if (this.isExtension(pattern)) {
+        const normalizedExt = this.normalizeExtension(pattern);
+        this.pluginExtensionColors.set(normalizedExt, color);
+      } else {
+        this.pluginPatternColors.set(pattern, color);
+      }
     }
   }
 
@@ -202,7 +220,7 @@ export class ColorPaletteManager {
 
   /**
    * Get the color for a file by its path.
-   * Checks user patterns/filenames first, then extension-based colors.
+   * Priority: User patterns > Plugin patterns > Extension colors
    * 
    * @param filePath - Workspace-relative file path (e.g., 'src/utils.ts', '.gitignore')
    * @returns Hex color string
@@ -212,14 +230,16 @@ export class ColorPaletteManager {
     const normalizedPath = filePath.replace(/\\/g, '/');
     const fileName = normalizedPath.split('/').pop() || normalizedPath;
     
-    // Priority 1: User patterns (most specific)
+    // Priority 1: User patterns (highest)
     for (const [pattern, color] of this.userPatternColors) {
-      // Check exact filename match first
-      if (pattern === fileName) {
+      if (pattern === fileName || minimatch(normalizedPath, pattern, { dot: true })) {
         return color;
       }
-      // Then try glob pattern
-      if (minimatch(normalizedPath, pattern, { dot: true })) {
+    }
+    
+    // Priority 2: Plugin patterns
+    for (const [pattern, color] of this.pluginPatternColors) {
+      if (pattern === fileName || minimatch(normalizedPath, pattern, { dot: true })) {
         return color;
       }
     }
@@ -247,8 +267,8 @@ export class ColorPaletteManager {
       return userColor;
     }
 
-    // Priority 2: Plugin colors
-    const pluginColor = this.pluginColors.get(normalizedExt);
+    // Priority 2: Plugin extension colors
+    const pluginColor = this.pluginExtensionColors.get(normalizedExt);
     if (pluginColor) {
       return pluginColor;
     }
@@ -292,6 +312,13 @@ export class ColorPaletteManager {
       }
     }
     
+    // Check plugin patterns
+    for (const [pattern, color] of this.pluginPatternColors) {
+      if (pattern === fileName || minimatch(normalizedPath, pattern, { dot: true })) {
+        return { color, source: 'plugin' };
+      }
+    }
+    
     // Fall back to extension
     const ext = this.getExtension(normalizedPath);
     return this.getColorInfo(ext);
@@ -311,7 +338,7 @@ export class ColorPaletteManager {
       return { color: userColor, source: 'user' };
     }
 
-    const pluginColor = this.pluginColors.get(normalizedExt);
+    const pluginColor = this.pluginExtensionColors.get(normalizedExt);
     if (pluginColor) {
       return { color: pluginColor, source: 'plugin' };
     }
@@ -333,14 +360,19 @@ export class ColorPaletteManager {
   getColorMap(): Record<string, string> {
     const map: Record<string, string> = {};
     
-    // Start with generated colors
+    // Start with generated colors (lowest priority)
     for (const [ext, color] of this.generatedColors) {
       map[ext] = color;
     }
     
-    // Override with plugin colors
-    for (const [ext, color] of this.pluginColors) {
+    // Override with plugin extension colors
+    for (const [ext, color] of this.pluginExtensionColors) {
       map[ext] = color;
+    }
+    
+    // Add plugin pattern colors
+    for (const [pattern, color] of this.pluginPatternColors) {
+      map[pattern] = color;
     }
     
     // Override with user extension colors
@@ -348,7 +380,7 @@ export class ColorPaletteManager {
       map[ext] = color;
     }
     
-    // Add user pattern colors (these need file path to resolve)
+    // Add user pattern colors (highest priority)
     for (const [pattern, color] of this.userPatternColors) {
       map[pattern] = color;
     }
@@ -361,7 +393,8 @@ export class ColorPaletteManager {
    */
   clear(): void {
     this.generatedColors.clear();
-    this.pluginColors.clear();
+    this.pluginExtensionColors.clear();
+    this.pluginPatternColors.clear();
     this.userExtensionColors.clear();
     this.userPatternColors.clear();
   }

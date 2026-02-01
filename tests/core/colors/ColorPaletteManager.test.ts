@@ -89,6 +89,20 @@ describe('ColorPaletteManager', () => {
       expect(manager.getColor('.ts')).toBe(DEFAULT_FALLBACK_COLOR);
       expect(manager.getColor('.css')).toBe('#0000FF');
     });
+
+    it('should support filename patterns', () => {
+      manager.setPluginColors({ 'project.godot': '#478CBF' });
+
+      expect(manager.getColorForFile('project.godot')).toBe('#478CBF');
+      expect(manager.getColorForFile('game/project.godot')).toBe('#478CBF');
+    });
+
+    it('should support glob patterns', () => {
+      manager.setPluginColors({ '**/*.test.ts': '#10B981' });
+
+      expect(manager.getColorForFile('utils.test.ts')).toBe('#10B981');
+      expect(manager.getColorForFile('src/utils.test.ts')).toBe('#10B981');
+    });
   });
 
   describe('addPluginColors', () => {
