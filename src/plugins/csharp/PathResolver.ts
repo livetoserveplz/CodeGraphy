@@ -65,25 +65,26 @@ export class PathResolver {
   }
 
   /**
-   * Resolves a using directive to a workspace-relative file path.
+   * Resolves a using directive to an absolute file path.
    * 
    * @param using - The detected using directive
    * @param fromFile - The file containing the using (for relative resolution)
-   * @returns The resolved path or null if external/unresolved
+   * @returns The resolved absolute path or null if external/unresolved
    */
   resolve(using: IDetectedUsing, _fromFile: string): string | null {
     const namespace = using.namespace;
     
     // Check if we have an exact namespace match from registered files
     if (this._namespaceToFileMap.has(namespace)) {
-      return this._namespaceToFileMap.get(namespace)!;
+      const relativePath = this._namespaceToFileMap.get(namespace)!;
+      return path.join(this._workspaceRoot, relativePath).replace(/\\/g, '/');
     }
     
     // Try to find a file that might contain this namespace
     // Convention: namespace parts map to directory structure
     const possiblePath = this._conventionBasedResolve(namespace);
     if (possiblePath) {
-      return possiblePath;
+      return path.join(this._workspaceRoot, possiblePath).replace(/\\/g, '/');
     }
     
     // Check if it's a System or third-party namespace (external)

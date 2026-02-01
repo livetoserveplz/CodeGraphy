@@ -75,7 +75,7 @@ describe('C# PathResolver', () => {
       const using = createUsing('MyApp.Services');
       const resolved = resolver.resolve(using, 'Program.cs');
       
-      expect(resolved).toBe('Services/UserService.cs');
+      expect(resolved).toBe('/workspace/Services/UserService.cs');
     });
 
     it('should handle multiple files in same namespace', () => {
@@ -86,7 +86,7 @@ describe('C# PathResolver', () => {
       const using = createUsing('MyApp.Services');
       const resolved = resolver.resolve(using, 'Program.cs');
       
-      expect(resolved).toBe('Services/OrderService.cs');
+      expect(resolved).toBe('/workspace/Services/OrderService.cs');
     });
   });
 
@@ -98,7 +98,7 @@ describe('C# PathResolver', () => {
       const resolverWithRoot = new PathResolver(workspaceRoot, { rootNamespace: 'MyApp' });
       const resolved = resolverWithRoot.resolve(using, 'Program.cs');
       
-      expect(resolved).toBe('Services/UserService.cs');
+      expect(resolved).toBe('/workspace/Services/UserService.cs');
     });
 
     it('should search in src directory', () => {
@@ -111,7 +111,7 @@ describe('C# PathResolver', () => {
       });
       const resolved = resolverWithRoot.resolve(using, 'Program.cs');
       
-      expect(resolved).toBe('src/Services/UserService.cs');
+      expect(resolved).toBe('/workspace/src/Services/UserService.cs');
     });
   });
 
@@ -152,7 +152,7 @@ describe('C# PathResolver', () => {
       const using = createUsing('MyApp.Utils', { isStatic: true });
       const resolved = resolver.resolve(using, 'Program.cs');
       
-      expect(resolved).toBe('Utils/MathHelper.cs');
+      expect(resolved).toBe('/workspace/Utils/MathHelper.cs');
     });
 
     it('should handle global using', () => {
@@ -161,7 +161,7 @@ describe('C# PathResolver', () => {
       const using = createUsing('MyApp.Common', { isGlobal: true });
       const resolved = resolver.resolve(using, 'GlobalUsings.cs');
       
-      expect(resolved).toBe('Common/Extensions.cs');
+      expect(resolved).toBe('/workspace/Common/Extensions.cs');
     });
 
     it('should handle using alias', () => {
@@ -170,7 +170,7 @@ describe('C# PathResolver', () => {
       const using = createUsing('MyApp.Data.Entities', { alias: 'Entities' });
       const resolved = resolver.resolve(using, 'Program.cs');
       
-      expect(resolved).toBe('Data/Entities/User.cs');
+      expect(resolved).toBe('/workspace/Data/Entities/User.cs');
     });
   });
 });
