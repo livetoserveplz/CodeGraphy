@@ -11,6 +11,7 @@ import {
   IGraphData,
   IGraphNode,
   IGraphEdge,
+  BidirectionalEdgeMode,
   WebviewToExtensionMessage,
   ExtensionToWebviewMessage,
 } from '../../shared/types';
@@ -40,6 +41,7 @@ interface GraphProps {
   data: IGraphData;
   favorites?: Set<string>;
   onFavoritesChange?: (favorites: Set<string>) => void;
+  bidirectionalMode?: BidirectionalEdgeMode;
 }
 
 /**
@@ -135,15 +137,83 @@ function toVisNode(node: IGraphNode, isFavorite: boolean) {
   };
 }
 
+/** Edge with bidirectional info */
+interface ProcessedEdge extends IGraphEdge {
+  bidirectional?: boolean;
+}
+
+/**
+ * Process edges to combine bidirectional ones if mode is 'combined'.
+ * Returns processed edges with bidirectional flag.
+ */
+function processEdges(edges: IGraphEdge[], mode: BidirectionalEdgeMode): ProcessedEdge[] {
+  if (mode === 'separate') {
+    return edges.map(e => ({ ...e, bidirectional: false }));
+  }
+
+  // Build a set of edge keys for quick lookup
+  const edgeSet = new Set(edges.map(e => `${e.from}->${e.to}`));
+  const processed: ProcessedEdge[] = [];
+  const seen = new Set<string>();
+
+  for (const edge of edges) {
+    const key = `${edge.from}->${edge.to}`;
+    const reverseKey = `${edge.to}->${edge.from}`;
+
+    if (seen.has(key) || seen.has(reverseKey)) {
+      continue; // Already processed as part of a bidirectional pair
+    }
+
+    if (edgeSet.has(reverseKey)) {
+      // This is a bidirectional connection - combine them
+      // Use lexicographically smaller 'from' to ensure consistency
+      const [nodeA, nodeB] = [edge.from, edge.to].sort();
+      processed.push({
+        id: `${nodeA}<->${nodeB}`,
+        from: nodeA,
+        to: nodeB,
+        bidirectional: true,
+      });
+      seen.add(key);
+      seen.add(reverseKey);
+    } else {
+      // Regular unidirectional edge
+      processed.push({ ...edge, bidirectional: false });
+      seen.add(key);
+    }
+  }
+
+  return processed;
+}
+
 /**
  * Convert IGraphEdge to Vis Network edge format
  */
-function toVisEdge(edge: IGraphEdge) {
-  return {
+function toVisEdge(edge: ProcessedEdge) {
+  const baseEdge = {
     id: edge.id,
     from: edge.from,
     to: edge.to,
   };
+
+  if (edge.bidirectional) {
+    // Bidirectional edge: arrows on both ends, different color
+    return {
+      ...baseEdge,
+      arrows: {
+        to: { enabled: true, scaleFactor: 0.5 },
+        from: { enabled: true, scaleFactor: 0.5 },
+      },
+      color: {
+        color: '#60a5fa', // Blue for bidirectional
+        highlight: '#93c5fd',
+        hover: '#93c5fd',
+      },
+      width: 2, // Thicker for visibility
+    };
+  }
+
+  return baseEdge;
 }
 
 /**
@@ -175,7 +245,7 @@ function sendAllPositions(network: Network, nodeIds: string[]): void {
 /**
  * Graph component with context menu and multi-select support.
  */
-export default function Graph({ data, favorites = new Set() }: GraphProps): React.ReactElement {
+export default function Graph({ data, favorites = new Set(), bidirectionalMode = 'separate' }: GraphProps): React.ReactElement {
   const containerRef = useRef<HTMLDivElement>(null);
   const networkRef = useRef<Network | null>(null);
   const nodesRef = useRef<DataSet<ReturnType<typeof toVisNode>> | null>(null);
@@ -183,6 +253,7 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
   const initializedRef = useRef(false);
   const dataRef = useRef(data);
   const favoritesRef = useRef(favorites);
+  const bidirectionalModeRef = useRef(bidirectionalMode);
   
   // Selection state
   const [selectedNodes, setSelectedNodes] = useState<string[]>([]);
@@ -195,6 +266,7 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
   // Keep refs current
   dataRef.current = data;
   favoritesRef.current = favorites;
+  bidirectionalModeRef.current = bidirectionalMode;
   selectedNodesRef.current = selectedNodes;
 
   /**
@@ -375,10 +447,12 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
 
     const initialData = dataRef.current;
     const currentFavorites = favoritesRef.current;
+    const currentMode = bidirectionalModeRef.current;
 
     // Create datasets
     const nodes = new DataSet(initialData.nodes.map(n => toVisNode(n, currentFavorites.has(n.id))));
-    const edges = new DataSet(initialData.edges.map(toVisEdge));
+    const processedEdges = processEdges(initialData.edges, currentMode);
+    const edges = new DataSet(processedEdges.map(toVisEdge));
 
     nodesRef.current = nodes;
     edgesRef.current = edges;
@@ -460,9 +534,10 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
       }
     });
 
-    // Update edges
+    // Update edges (with bidirectional processing)
+    const processedEdges = processEdges(data.edges, bidirectionalModeRef.current);
     const currentEdgeIds = new Set(edgesRef.current.getIds());
-    const newEdgeIds = new Set(data.edges.map((e) => e.id));
+    const newEdgeIds = new Set(processedEdges.map((e) => e.id));
 
     currentEdgeIds.forEach((id) => {
       if (!newEdgeIds.has(id as string)) {
@@ -470,7 +545,7 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
       }
     });
 
-    data.edges.forEach((edge) => {
+    processedEdges.forEach((edge) => {
       if (currentEdgeIds.has(edge.id)) {
         edgesRef.current?.update(toVisEdge(edge));
       } else {
@@ -490,6 +565,22 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
       nodesRef.current?.update(visNode);
     });
   }, [favorites, data.nodes]);
+
+  /**
+   * Update edges when bidirectional mode changes
+   */
+  useEffect(() => {
+    if (!edgesRef.current || !initializedRef.current) return;
+
+    // Clear and rebuild edges with new mode
+    const processedEdges = processEdges(data.edges, bidirectionalMode);
+    // Use remove + add instead of clear (which may not be available in all DataSet versions)
+    const currentIds = edgesRef.current.getIds();
+    if (currentIds.length > 0) {
+      edgesRef.current.remove(currentIds);
+    }
+    edgesRef.current.add(processedEdges.map(toVisEdge));
+  }, [bidirectionalMode, data.edges]);
 
   /**
    * Handle context menu trigger - captures node BEFORE Radix opens menu

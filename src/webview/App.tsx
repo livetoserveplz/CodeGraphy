@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Graph from './components/Graph';
 import GraphIcon from './components/GraphIcon';
-import { IGraphData, ExtensionToWebviewMessage, WebviewToExtensionMessage } from '../shared/types';
+import { IGraphData, BidirectionalEdgeMode, ExtensionToWebviewMessage, WebviewToExtensionMessage } from '../shared/types';
 
 // Get VSCode API if available (must be called exactly once at module level)
 declare function acquireVsCodeApi(): {
@@ -25,6 +25,7 @@ export default function App(): React.ReactElement {
   const [graphData, setGraphData] = useState<IGraphData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [bidirectionalMode, setBidirectionalMode] = useState<BidirectionalEdgeMode>('separate');
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent<ExtensionToWebviewMessage>) => {
@@ -37,6 +38,9 @@ export default function App(): React.ReactElement {
           break;
         case 'FAVORITES_UPDATED':
           setFavorites(new Set(message.payload.favorites));
+          break;
+        case 'SETTINGS_UPDATED':
+          setBidirectionalMode(message.payload.bidirectionalEdges);
           break;
       }
     };
@@ -85,7 +89,7 @@ export default function App(): React.ReactElement {
   // Graph view - relative container for absolute positioned graph
   return (
     <div className="relative w-full h-screen">
-      <Graph data={graphData} favorites={favorites} />
+      <Graph data={graphData} favorites={favorites} bidirectionalMode={bidirectionalMode} />
     </div>
   );
 }

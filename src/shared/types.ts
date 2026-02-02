@@ -188,6 +188,9 @@ export interface IGraphData {
  * webview.postMessage(message);
  * ```
  */
+/** Bidirectional edge display mode */
+export type BidirectionalEdgeMode = 'separate' | 'combined';
+
 export type ExtensionToWebviewMessage =
   | { type: 'GRAPH_DATA_UPDATED'; payload: IGraphData }
   | { type: 'FIT_VIEW' }
@@ -195,7 +198,8 @@ export type ExtensionToWebviewMessage =
   | { type: 'ZOOM_OUT' }
   | { type: 'FAVORITES_UPDATED'; payload: { favorites: string[] } }
   | { type: 'THEME_CHANGED'; payload: { kind: 'light' | 'dark' | 'high-contrast' } }
-  | { type: 'FILE_INFO'; payload: IFileInfo };
+  | { type: 'FILE_INFO'; payload: IFileInfo }
+  | { type: 'SETTINGS_UPDATED'; payload: { bidirectionalEdges: BidirectionalEdgeMode } };
 
 /**
  * Messages sent from the Webview to the Extension.
