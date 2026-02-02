@@ -1,7 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import Graph from './components/Graph';
 import GraphIcon from './components/GraphIcon';
-import { IGraphData, ExtensionToWebviewMessage, WebviewToExtensionMessage } from '../shared/types';
+import PhysicsSettings from './components/PhysicsSettings';
+import { IGraphData, IPhysicsSettings, ExtensionToWebviewMessage, WebviewToExtensionMessage } from '../shared/types';
+
+/** Default physics settings */
+const DEFAULT_PHYSICS: IPhysicsSettings = {
+  gravitationalConstant: -50,
+  springLength: 100,
+  springConstant: 0.08,
+  damping: 0.4,
+  centralGravity: 0.01,
+};
 
 // Get VSCode API if available (must be called exactly once at module level)
 declare function acquireVsCodeApi(): {
@@ -25,6 +35,7 @@ export default function App(): React.ReactElement {
   const [graphData, setGraphData] = useState<IGraphData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [physicsSettings, setPhysicsSettings] = useState<IPhysicsSettings>(DEFAULT_PHYSICS);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent<ExtensionToWebviewMessage>) => {
@@ -37,6 +48,9 @@ export default function App(): React.ReactElement {
           break;
         case 'FAVORITES_UPDATED':
           setFavorites(new Set(message.payload.favorites));
+          break;
+        case 'PHYSICS_SETTINGS_UPDATED':
+          setPhysicsSettings(message.payload);
           break;
       }
     };
@@ -85,7 +99,11 @@ export default function App(): React.ReactElement {
   // Graph view - relative container for absolute positioned graph
   return (
     <div className="relative w-full h-screen">
-      <Graph data={graphData} favorites={favorites} />
+      <Graph data={graphData} favorites={favorites} physicsSettings={physicsSettings} />
+      <PhysicsSettings 
+        settings={physicsSettings} 
+        onSettingsChange={setPhysicsSettings}
+      />
     </div>
   );
 }

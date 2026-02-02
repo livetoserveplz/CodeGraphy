@@ -11,6 +11,7 @@ import {
   IGraphData,
   IGraphNode,
   IGraphEdge,
+  IPhysicsSettings,
   WebviewToExtensionMessage,
   ExtensionToWebviewMessage,
 } from '../../shared/types';
@@ -40,6 +41,7 @@ interface GraphProps {
   data: IGraphData;
   favorites?: Set<string>;
   onFavoritesChange?: (favorites: Set<string>) => void;
+  physicsSettings?: IPhysicsSettings;
 }
 
 /**
@@ -172,10 +174,19 @@ function sendAllPositions(network: Network, nodeIds: string[]): void {
   postMessage({ type: 'POSITIONS_UPDATED', payload: { positions } });
 }
 
+/** Default physics settings */
+const DEFAULT_PHYSICS: IPhysicsSettings = {
+  gravitationalConstant: -50,
+  springLength: 100,
+  springConstant: 0.08,
+  damping: 0.4,
+  centralGravity: 0.01,
+};
+
 /**
  * Graph component with context menu and multi-select support.
  */
-export default function Graph({ data, favorites = new Set() }: GraphProps): React.ReactElement {
+export default function Graph({ data, favorites = new Set(), physicsSettings = DEFAULT_PHYSICS }: GraphProps): React.ReactElement {
   const containerRef = useRef<HTMLDivElement>(null);
   const networkRef = useRef<Network | null>(null);
   const nodesRef = useRef<DataSet<ReturnType<typeof toVisNode>> | null>(null);
@@ -490,6 +501,26 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
       nodesRef.current?.update(visNode);
     });
   }, [favorites, data.nodes]);
+
+  /**
+   * Update physics settings when they change
+   */
+  useEffect(() => {
+    const network = networkRef.current;
+    if (!network) return;
+
+    network.setOptions({
+      physics: {
+        forceAtlas2Based: {
+          gravitationalConstant: physicsSettings.gravitationalConstant,
+          centralGravity: physicsSettings.centralGravity,
+          springLength: physicsSettings.springLength,
+          springConstant: physicsSettings.springConstant,
+          damping: physicsSettings.damping,
+        },
+      },
+    });
+  }, [physicsSettings]);
 
   /**
    * Handle context menu trigger - captures node BEFORE Radix opens menu
