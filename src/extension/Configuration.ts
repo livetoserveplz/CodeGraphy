@@ -5,6 +5,7 @@
  */
 
 import * as vscode from 'vscode';
+import { NodeSizeMode } from '../shared/types';
 
 /**
  * Default exclude patterns for file discovery.
@@ -128,6 +129,25 @@ export class Configuration {
    */
   get fileColors(): Record<string, string> {
     return this.config.get<Record<string, string>>('fileColors', {});
+  }
+
+  /**
+   * What determines node size in the graph.
+   * Options: 'connections', 'file-size', 'access-count', 'uniform'
+   * @default 'connections'
+   */
+  get nodeSizeBy(): NodeSizeMode {
+    return this.config.get<NodeSizeMode>('nodeSizeBy', 'connections');
+  }
+
+  /**
+   * Gets a configuration value by key with a default.
+   * @param key - Configuration key (without 'codegraphy.' prefix)
+   * @param defaultValue - Default value if not set
+   * @returns The configuration value or default
+   */
+  get<T>(key: string, defaultValue: T): T {
+    return this.config.get<T>(key, defaultValue);
   }
 
   /**

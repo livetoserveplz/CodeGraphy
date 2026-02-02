@@ -13,6 +13,7 @@ import {
   IGraphEdge,
   WebviewToExtensionMessage,
   ExtensionToWebviewMessage,
+  NodeSizeMode,
 } from '../../shared/types';
 import {
   ContextMenu,
@@ -109,14 +110,109 @@ const NETWORK_OPTIONS: Options = {
   },
 };
 
+/** Minimum and maximum node sizes */
+const MIN_NODE_SIZE = 10;
+const MAX_NODE_SIZE = 40;
+const DEFAULT_NODE_SIZE = 16;
+
+/**
+ * Calculate node sizes for all nodes based on the sizing mode.
+ * Returns a map of node ID to size.
+ */
+function calculateNodeSizes(
+  nodes: IGraphNode[],
+  edges: { from: string; to: string }[],
+  mode: NodeSizeMode
+): Map<string, number> {
+  const sizes = new Map<string, number>();
+
+  if (mode === 'uniform') {
+    // All nodes same size
+    for (const node of nodes) {
+      sizes.set(node.id, DEFAULT_NODE_SIZE);
+    }
+    return sizes;
+  }
+
+  if (mode === 'connections' || mode === 'access-count') {
+    // Size by connection count (access-count falls back to this for now)
+    const connectionCounts = new Map<string, number>();
+    
+    // Count connections for each node
+    for (const node of nodes) {
+      connectionCounts.set(node.id, 0);
+    }
+    for (const edge of edges) {
+      connectionCounts.set(edge.from, (connectionCounts.get(edge.from) ?? 0) + 1);
+      connectionCounts.set(edge.to, (connectionCounts.get(edge.to) ?? 0) + 1);
+    }
+
+    // Find min/max for normalization
+    const counts = Array.from(connectionCounts.values());
+    const minCount = Math.min(...counts, 0);
+    const maxCount = Math.max(...counts, 1);
+    const range = maxCount - minCount || 1;
+
+    // Calculate sizes
+    for (const node of nodes) {
+      const count = connectionCounts.get(node.id) ?? 0;
+      const normalized = (count - minCount) / range;
+      const size = MIN_NODE_SIZE + normalized * (MAX_NODE_SIZE - MIN_NODE_SIZE);
+      sizes.set(node.id, size);
+    }
+    return sizes;
+  }
+
+  if (mode === 'file-size') {
+    // Size by file size in bytes
+    const fileSizes = nodes
+      .map(n => n.fileSize ?? 0)
+      .filter(s => s > 0);
+
+    if (fileSizes.length === 0) {
+      // No file sizes available, fall back to uniform
+      for (const node of nodes) {
+        sizes.set(node.id, DEFAULT_NODE_SIZE);
+      }
+      return sizes;
+    }
+
+    // Use logarithmic scale for file sizes (to handle large variance)
+    const logSizes = fileSizes.map(s => Math.log10(s + 1));
+    const minLog = Math.min(...logSizes);
+    const maxLog = Math.max(...logSizes);
+    const range = maxLog - minLog || 1;
+
+    for (const node of nodes) {
+      const fileSize = node.fileSize ?? 0;
+      if (fileSize === 0) {
+        sizes.set(node.id, MIN_NODE_SIZE);
+      } else {
+        const logSize = Math.log10(fileSize + 1);
+        const normalized = (logSize - minLog) / range;
+        const size = MIN_NODE_SIZE + normalized * (MAX_NODE_SIZE - MIN_NODE_SIZE);
+        sizes.set(node.id, size);
+      }
+    }
+    return sizes;
+  }
+
+  // Default fallback
+  for (const node of nodes) {
+    sizes.set(node.id, DEFAULT_NODE_SIZE);
+  }
+  return sizes;
+}
+
 /**
  * Convert IGraphNode to Vis Network node format
  */
-function toVisNode(node: IGraphNode, isFavorite: boolean) {
+function toVisNode(node: IGraphNode, isFavorite: boolean, size: number = DEFAULT_NODE_SIZE) {
   const borderColor = isFavorite ? FAVORITE_BORDER_COLOR : node.color;
   return {
     id: node.id,
     label: node.label,
+    size,
     color: {
       background: node.color,
       border: borderColor,
@@ -376,8 +472,17 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
     const initialData = dataRef.current;
     const currentFavorites = favoritesRef.current;
 
+    // Calculate node sizes based on sizing mode
+    const nodeSizes = calculateNodeSizes(
+      initialData.nodes,
+      initialData.edges,
+      initialData.nodeSizeMode ?? 'connections'
+    );
+
     // Create datasets
-    const nodes = new DataSet(initialData.nodes.map(n => toVisNode(n, currentFavorites.has(n.id))));
+    const nodes = new DataSet(initialData.nodes.map(n => 
+      toVisNode(n, currentFavorites.has(n.id), nodeSizes.get(n.id))
+    ));
     const edges = new DataSet(initialData.edges.map(toVisEdge));
 
     nodesRef.current = nodes;
@@ -441,6 +546,13 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
 
     const currentFavorites = favoritesRef.current;
 
+    // Calculate node sizes for the updated data
+    const nodeSizes = calculateNodeSizes(
+      data.nodes,
+      data.edges,
+      data.nodeSizeMode ?? 'connections'
+    );
+
     // Update nodes
     const currentNodeIds = new Set(nodesRef.current.getIds());
     const newNodeIds = new Set(data.nodes.map((n) => n.id));
@@ -452,7 +564,7 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
     });
 
     data.nodes.forEach((node) => {
-      const visNode = toVisNode(node, currentFavorites.has(node.id));
+      const visNode = toVisNode(node, currentFavorites.has(node.id), nodeSizes.get(node.id));
       if (currentNodeIds.has(node.id)) {
         nodesRef.current?.update(visNode);
       } else {
@@ -485,11 +597,18 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
   useEffect(() => {
     if (!nodesRef.current) return;
     
+    // Recalculate sizes to maintain consistency
+    const nodeSizes = calculateNodeSizes(
+      data.nodes,
+      data.edges,
+      data.nodeSizeMode ?? 'connections'
+    );
+    
     data.nodes.forEach((node) => {
-      const visNode = toVisNode(node, favorites.has(node.id));
+      const visNode = toVisNode(node, favorites.has(node.id), nodeSizes.get(node.id));
       nodesRef.current?.update(visNode);
     });
-  }, [favorites, data.nodes]);
+  }, [favorites, data.nodes, data.edges, data.nodeSizeMode]);
 
   /**
    * Handle context menu trigger - captures node BEFORE Radix opens menu
