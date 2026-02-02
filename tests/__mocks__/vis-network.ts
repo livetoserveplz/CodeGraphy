@@ -7,6 +7,9 @@ const globalEventHandlers: Map<string, EventHandler[]> = new Map();
 // Keep track of all Network instances for event simulation
 const networkInstances: Network[] = [];
 
+// Store what getNodeAt should return (for testing context menu behavior)
+let mockNodeAtPosition: string | undefined = undefined;
+
 // Mock Network class with event simulation support
 export class Network {
   private instanceHandlers: Map<string, EventHandler[]> = new Map();
@@ -65,7 +68,8 @@ export class Network {
 
   getSelectedNodes = vi.fn(() => [...this.selectedNodes]);
 
-  getNodeAt = vi.fn((_position: { x: number; y: number }) => undefined as string | undefined);
+  // Returns the mocked node at position (set via mockGetNodeAt)
+  getNodeAt = vi.fn((_position: { x: number; y: number }) => mockNodeAtPosition);
 
   // Instance method to trigger events on this network
   triggerEvent(eventName: string, params: unknown) {
@@ -95,6 +99,12 @@ export class Network {
       instance.instanceHandlers.clear();
     });
     networkInstances.length = 0;
+    mockNodeAtPosition = undefined;
+  }
+
+  // Static helper to mock what getNodeAt returns (for context menu tests)
+  static mockGetNodeAt(nodeId: string | undefined) {
+    mockNodeAtPosition = nodeId;
   }
 }
 

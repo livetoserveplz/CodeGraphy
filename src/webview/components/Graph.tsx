@@ -419,19 +419,31 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
 
     // Handle right-click for context menu (set state only, let Radix handle the event)
     network.on('oncontext', (params) => {
-      // On Mac, Ctrl+click triggers context menu. Skip selection change if this is
-      // a Ctrl+click attempt at multi-select (let vis-network handle it naturally).
       const event = params.event as MouseEvent | undefined;
-      if (event && event.ctrlKey && !event.metaKey) {
-        // Ctrl+click on Mac - don't interfere with multi-select
-        // Just set context target from current selection
-        contextTargetRef.current = [...selectedNodesRef.current];
-        setIsBackgroundContext(selectedNodesRef.current.length === 0);
-        return;
-      }
-
       const nodeId = network.getNodeAt(params.pointer.DOM) as string | undefined;
       
+      // On Mac, Ctrl+click triggers context menu. Handle this specially to support
+      // multi-select without resetting selection.
+      if (event && event.ctrlKey && !event.metaKey) {
+        // Ctrl+click behavior (Mac multi-select via context menu trigger)
+        if (nodeId) {
+          // Ctrl+click on a node - include it in context target along with current selection
+          // This fixes bug #39: first Ctrl+click on node was showing background menu
+          // because selectedNodesRef.current was empty
+          const newTarget = selectedNodesRef.current.includes(nodeId)
+            ? [...selectedNodesRef.current]
+            : [...selectedNodesRef.current, nodeId];
+          contextTargetRef.current = newTarget;
+          setIsBackgroundContext(false);
+        } else {
+          // Ctrl+click on background - use current selection
+          contextTargetRef.current = [...selectedNodesRef.current];
+          setIsBackgroundContext(selectedNodesRef.current.length === 0);
+        }
+        return;
+      }
+      
+      // Normal right-click behavior
       if (nodeId) {
         // Right-clicked on a node
         if (!selectedNodesRef.current.includes(nodeId)) {
