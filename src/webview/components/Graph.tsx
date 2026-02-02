@@ -11,6 +11,7 @@ import {
   IGraphData,
   IGraphNode,
   IGraphEdge,
+  IFileInfo,
   BidirectionalEdgeMode,
   WebviewToExtensionMessage,
   ExtensionToWebviewMessage,
@@ -23,6 +24,8 @@ import {
   ContextMenuSeparator,
   ContextMenuShortcut,
 } from './ui/context-menu';
+import { NodeTooltip } from './NodeTooltip';
+import { ThemeKind, adjustColorForLightTheme } from '../hooks/useTheme';
 
 // Get VSCode API (provided by the extension host)
 declare function acquireVsCodeApi(): {
@@ -41,6 +44,7 @@ interface GraphProps {
   data: IGraphData;
   favorites?: Set<string>;
   onFavoritesChange?: (favorites: Set<string>) => void;
+  theme?: ThemeKind;
   bidirectionalMode?: BidirectionalEdgeMode;
 }
 
@@ -114,22 +118,30 @@ const NETWORK_OPTIONS: Options = {
 /**
  * Convert IGraphNode to Vis Network node format
  */
-function toVisNode(node: IGraphNode, isFavorite: boolean) {
-  const borderColor = isFavorite ? FAVORITE_BORDER_COLOR : node.color;
+function toVisNode(node: IGraphNode, isFavorite: boolean, theme: ThemeKind = 'dark') {
+  const isLight = theme === 'light';
+  const nodeColor = isLight ? adjustColorForLightTheme(node.color) : node.color;
+  const borderColor = isFavorite ? FAVORITE_BORDER_COLOR : nodeColor;
+  const textColor = isLight ? '#1e1e1e' : '#e2e8f0';
+  
   return {
     id: node.id,
     label: node.label,
     color: {
-      background: node.color,
+      background: nodeColor,
       border: borderColor,
       highlight: {
-        background: node.color,
-        border: isFavorite ? FAVORITE_BORDER_COLOR : '#ffffff',
+        background: nodeColor,
+        border: isFavorite ? FAVORITE_BORDER_COLOR : (isLight ? '#000000' : '#ffffff'),
       },
       hover: {
-        background: node.color,
-        border: isFavorite ? FAVORITE_BORDER_COLOR : '#94a3b8',
+        background: nodeColor,
+        border: isFavorite ? FAVORITE_BORDER_COLOR : (isLight ? '#64748b' : '#94a3b8'),
       },
+    },
+    font: {
+      color: textColor,
+      size: 12,
     },
     borderWidth: isFavorite ? 3 : 2,
     x: node.x,
@@ -287,7 +299,7 @@ function sendAllPositions(network: Network, nodeIds: string[]): void {
 /**
  * Graph component with context menu and multi-select support.
  */
-export default function Graph({ data, favorites = new Set(), bidirectionalMode = 'separate' }: GraphProps): React.ReactElement {
+export default function Graph({ data, favorites = new Set(), theme = 'dark', bidirectionalMode = 'separate' }: GraphProps): React.ReactElement {
   const containerRef = useRef<HTMLDivElement>(null);
   const networkRef = useRef<Network | null>(null);
   const nodesRef = useRef<DataSet<ReturnType<typeof toVisNode>> | null>(null);
@@ -301,15 +313,29 @@ export default function Graph({ data, favorites = new Set(), bidirectionalMode =
   const [selectedNodes, setSelectedNodes] = useState<string[]>([]);
   const [isBackgroundContext, setIsBackgroundContext] = useState(false);
   const selectedNodesRef = useRef(selectedNodes);
+  const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   
   // Context menu target (set synchronously on right-click)
   const contextTargetRef = useRef<string[]>([]);
+  
+  // Tooltip state
+  const [tooltipData, setTooltipData] = useState<{
+    visible: boolean;
+    position: { x: number; y: number };
+    path: string;
+    info: IFileInfo | null;
+  }>({ visible: false, position: { x: 0, y: 0 }, path: '', info: null });
+  const tooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const fileInfoCacheRef = useRef<Map<string, IFileInfo>>(new Map());
 
+  const themeRef = useRef(theme);
+  
   // Keep refs current
   dataRef.current = data;
   favoritesRef.current = favorites;
   bidirectionalModeRef.current = bidirectionalMode;
   selectedNodesRef.current = selectedNodes;
+  themeRef.current = theme;
 
   /**
    * Handle context menu actions
@@ -321,6 +347,8 @@ export default function Graph({ data, favorites = new Set(), bidirectionalMode =
     switch (action) {
       case 'open':
         targetPaths.forEach(path => {
+          // Clear cache so visit count is refreshed on next hover
+          fileInfoCacheRef.current.delete(path);
           postMessage({ type: 'OPEN_FILE', payload: { path } });
         });
         break;
@@ -407,6 +435,16 @@ export default function Graph({ data, favorites = new Set(), bidirectionalMode =
         case 'FAVORITES_UPDATED':
           // Will be handled by parent component
           break;
+        case 'FILE_INFO':
+          // Cache and update tooltip
+          fileInfoCacheRef.current.set(message.payload.path, message.payload);
+          setTooltipData(prev => {
+            if (prev.path === message.payload.path) {
+              return { ...prev, info: message.payload };
+            }
+            return prev;
+          });
+          break;
         case 'REQUEST_EXPORT_PNG':
           exportAsPng(network);
           break;
@@ -447,6 +485,8 @@ export default function Graph({ data, favorites = new Set(), bidirectionalMode =
           if (selectedNodes.length > 0) {
             event.preventDefault();
             selectedNodes.forEach(nodeId => {
+              // Clear cache so visit count is refreshed on next hover
+              fileInfoCacheRef.current.delete(nodeId);
               postMessage({ type: 'NODE_DOUBLE_CLICKED', payload: { nodeId } });
             });
           }
@@ -495,7 +535,7 @@ export default function Graph({ data, favorites = new Set(), bidirectionalMode =
     const currentMode = bidirectionalModeRef.current;
 
     // Create datasets
-    const nodes = new DataSet(initialData.nodes.map(n => toVisNode(n, currentFavorites.has(n.id))));
+    const nodes = new DataSet(initialData.nodes.map(n => toVisNode(n, currentFavorites.has(n.id), themeRef.current)));
     const processedEdges = processEdges(initialData.edges, currentMode);
     const edges = new DataSet(processedEdges.map(toVisEdge));
 
@@ -532,6 +572,8 @@ export default function Graph({ data, favorites = new Set(), bidirectionalMode =
     network.on('doubleClick', (params) => {
       if (params.nodes.length > 0) {
         const nodeId = params.nodes[0] as string;
+        // Clear cache so visit count is refreshed on next hover
+        fileInfoCacheRef.current.delete(nodeId);
         postMessage({ type: 'NODE_DOUBLE_CLICKED', payload: { nodeId } });
       }
     });
@@ -539,6 +581,47 @@ export default function Graph({ data, favorites = new Set(), bidirectionalMode =
     // Note: Context menu logic is handled by onContextMenu on the container div
     // This fires before Radix opens the menu, fixing the timing issue where
     // first Ctrl+click showed background menu instead of node menu.
+
+    // Handle hover for highlighting connected nodes and tooltips
+    network.on('hoverNode', (params) => {
+      const nodeId = params.node as string;
+      setHoveredNode(nodeId);
+      
+      // Show tooltip after delay
+      if (tooltipTimeoutRef.current) {
+        clearTimeout(tooltipTimeoutRef.current);
+      }
+      
+      tooltipTimeoutRef.current = setTimeout(() => {
+        const position = params.event.center || { x: params.event.clientX || 0, y: params.event.clientY || 0 };
+        
+        // Check cache first
+        const cached = fileInfoCacheRef.current.get(nodeId);
+        
+        setTooltipData({
+          visible: true,
+          position: { x: position.x, y: position.y },
+          path: nodeId,
+          info: cached || null,
+        });
+        
+        // Request file info if not cached
+        if (!cached) {
+          postMessage({ type: 'GET_FILE_INFO', payload: { path: nodeId } });
+        }
+      }, 500); // 500ms delay before showing tooltip
+    });
+
+    network.on('blurNode', () => {
+      setHoveredNode(null);
+      
+      // Clear tooltip timeout and hide
+      if (tooltipTimeoutRef.current) {
+        clearTimeout(tooltipTimeoutRef.current);
+        tooltipTimeoutRef.current = null;
+      }
+      setTooltipData(prev => ({ ...prev, visible: false }));
+    });
 
     // Notify extension that webview is ready
     postMessage({ type: 'WEBVIEW_READY', payload: null });
@@ -571,7 +654,7 @@ export default function Graph({ data, favorites = new Set(), bidirectionalMode =
     });
 
     data.nodes.forEach((node) => {
-      const visNode = toVisNode(node, currentFavorites.has(node.id));
+      const visNode = toVisNode(node, currentFavorites.has(node.id), themeRef.current);
       if (currentNodeIds.has(node.id)) {
         nodesRef.current?.update(visNode);
       } else {
@@ -606,10 +689,112 @@ export default function Graph({ data, favorites = new Set(), bidirectionalMode =
     if (!nodesRef.current) return;
     
     data.nodes.forEach((node) => {
-      const visNode = toVisNode(node, favorites.has(node.id));
+      const visNode = toVisNode(node, favorites.has(node.id), theme);
       nodesRef.current?.update(visNode);
     });
-  }, [favorites, data.nodes]);
+  }, [favorites, data.nodes, theme]);
+
+  /**
+   * Handle hover highlighting - dim unconnected nodes
+   */
+  useEffect(() => {
+    if (!nodesRef.current || !edgesRef.current) return;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const nodesDataSet = nodesRef.current as any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const edgesDataSet = edgesRef.current as any;
+
+    if (hoveredNode) {
+      // Find connected nodes
+      const connectedNodeIds = new Set<string>([hoveredNode]);
+      
+      data.edges.forEach((edge) => {
+        if (edge.from === hoveredNode) {
+          connectedNodeIds.add(edge.to);
+        }
+        if (edge.to === hoveredNode) {
+          connectedNodeIds.add(edge.from);
+        }
+      });
+
+      // Theme-aware colors
+      const isLight = themeRef.current === 'light';
+      const activeTextColor = isLight ? '#1e1e1e' : '#e2e8f0';
+      const dimTextColor = isLight ? '#9ca3af' : '#4a5568';
+      const highlightBorder = isLight ? '#000000' : '#ffffff';
+      const hoverBorder = isLight ? '#64748b' : '#94a3b8';
+      const dimEdgeColor = isLight ? '#d4d4d4' : '#2d3748';
+
+      // Update node opacity
+      data.nodes.forEach((node) => {
+        const isConnected = connectedNodeIds.has(node.id);
+        const isFavorite = favorites.has(node.id);
+        const nodeColor = isLight ? adjustColorForLightTheme(node.color) : node.color;
+        
+        nodesDataSet.update({
+          id: node.id,
+          opacity: isConnected ? 1.0 : 0.2,
+          font: {
+            color: isConnected ? activeTextColor : dimTextColor,
+            size: 12,
+          },
+          color: {
+            background: nodeColor,
+            border: isFavorite ? FAVORITE_BORDER_COLOR : nodeColor,
+            highlight: {
+              background: nodeColor,
+              border: isFavorite ? FAVORITE_BORDER_COLOR : highlightBorder,
+            },
+            hover: {
+              background: nodeColor,
+              border: isFavorite ? FAVORITE_BORDER_COLOR : hoverBorder,
+            },
+          },
+        });
+      });
+
+      // Update edge opacity
+      data.edges.forEach((edge) => {
+        const isConnected = edge.from === hoveredNode || edge.to === hoveredNode;
+        edgesDataSet.update({
+          id: edge.id,
+          color: {
+            color: isConnected ? '#60a5fa' : dimEdgeColor,
+            highlight: '#60a5fa',
+            hover: '#60a5fa',
+          },
+          width: isConnected ? 2 : 1,
+        });
+      });
+    } else {
+      // Reset all nodes and edges to normal
+      const isLight = themeRef.current === 'light';
+      const textColor = isLight ? '#1e1e1e' : '#e2e8f0';
+      const edgeColor = isLight ? '#94a3b8' : '#475569';
+      
+      data.nodes.forEach((node) => {
+        const visNode = toVisNode(node, favorites.has(node.id), themeRef.current);
+        nodesDataSet.update({
+          ...visNode,
+          opacity: 1.0,
+          font: { color: textColor, size: 12 },
+        });
+      });
+
+      data.edges.forEach((edge) => {
+        edgesDataSet.update({
+          id: edge.id,
+          color: {
+            color: edgeColor,
+            highlight: '#60a5fa',
+            hover: '#60a5fa',
+          },
+          width: 1,
+        });
+      });
+    }
+  }, [hoveredNode, data, favorites, theme]);
 
   /**
    * Update edges when bidirectional mode changes
@@ -640,6 +825,13 @@ export default function Graph({ data, favorites = new Set(), bidirectionalMode =
     const network = networkRef.current;
     const container = containerRef.current;
     if (!network || !container) return;
+
+    // Hide tooltip when opening context menu
+    if (tooltipTimeoutRef.current) {
+      clearTimeout(tooltipTimeoutRef.current);
+      tooltipTimeoutRef.current = null;
+    }
+    setTooltipData(prev => ({ ...prev, visible: false }));
 
     // Get pointer position relative to the container
     const rect = container.getBoundingClientRect();
@@ -674,14 +866,18 @@ export default function Graph({ data, favorites = new Set(), bidirectionalMode =
   const isMultiSelect = menuTargets.length > 1;
   const allFavorited = menuTargets.length > 0 && menuTargets.every(id => favorites.has(id));
 
+  const isLight = theme === 'light';
+  const bgColor = isLight ? '#f5f5f5' : '#18181b';
+  const borderColor = isLight ? '#d4d4d4' : 'rgb(63, 63, 70)'; // zinc-700
+  
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <div
           ref={containerRef}
           onContextMenu={handleContextMenu}
-          className="graph-container absolute inset-0 rounded-lg border border-zinc-700 m-1 outline-none focus:outline-none"
-          style={{ backgroundColor: '#18181b' }}
+          className="graph-container absolute inset-0 rounded-lg m-1 outline-none focus:outline-none"
+          style={{ backgroundColor: bgColor, borderWidth: 1, borderStyle: 'solid', borderColor }}
           tabIndex={0}
         />
       </ContextMenuTrigger>
@@ -765,6 +961,19 @@ export default function Graph({ data, favorites = new Set(), bidirectionalMode =
           </>
         )}
       </ContextMenuContent>
+      
+      {/* Tooltip */}
+      <NodeTooltip
+        path={tooltipData.path}
+        size={tooltipData.info?.size}
+        lastModified={tooltipData.info?.lastModified}
+        incomingCount={tooltipData.info?.incomingCount ?? 0}
+        outgoingCount={tooltipData.info?.outgoingCount ?? 0}
+        plugin={tooltipData.info?.plugin}
+        visits={tooltipData.info?.visits}
+        position={tooltipData.position}
+        visible={tooltipData.visible}
+      />
     </ContextMenu>
   );
 }
