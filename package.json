@@ -45,6 +45,10 @@
       {
         "command": "codegraphy.redo",
         "title": "CodeGraphy: Redo"
+      },
+      {
+        "command": "codegraphy.exportPng",
+        "title": "CodeGraphy: Export as PNG"
       }
     ],
     "keybindings": [

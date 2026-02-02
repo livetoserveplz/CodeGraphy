@@ -68,6 +68,12 @@ export function activate(context: vscode.ExtensionContext): void {
       }
     })
   );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('codegraphy.exportPng', () => {
+      provider.requestExportPng();
+    })
+  );
 }
 
 export function deactivate(): void {

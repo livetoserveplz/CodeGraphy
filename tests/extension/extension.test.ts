@@ -48,7 +48,7 @@ describe('Extension', () => {
     it('should add subscriptions to context', () => {
       activate(mockContext as unknown as Parameters<typeof activate>[0]);
 
-      expect(mockContext.subscriptions.length).toBe(8); // view provider + 6 commands + config listener
+      expect(mockContext.subscriptions.length).toBe(9); // view provider + 7 commands (open, fitView, zoomIn, zoomOut, undo, redo, exportPng) + config listener
     });
   });
 
