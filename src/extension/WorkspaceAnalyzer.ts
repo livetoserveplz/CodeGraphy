@@ -11,6 +11,8 @@ import { FileDiscovery, IDiscoveredFile } from '../core/discovery';
 import { Configuration } from './Configuration';
 import { createTypeScriptPlugin } from '../plugins/typescript';
 import { createGDScriptPlugin } from '../plugins/godot';
+import { createPythonPlugin } from '../plugins/python';
+import { createCSharpPlugin } from '../plugins/csharp';
 import { ColorPaletteManager } from '../core/colors';
 import { IGraphData, IGraphNode, IGraphEdge } from '../shared/types';
 
@@ -35,7 +37,7 @@ interface IAnalysisCache {
 }
 
 const CACHE_KEY = 'codegraphy.analysisCache';
-const CACHE_VERSION = '1.0.0';
+const CACHE_VERSION = '1.3.0'; // Bumped for C# PathResolver fix
 
 /**
  * Orchestrates workspace analysis.
@@ -82,6 +84,13 @@ export class WorkspaceAnalyzer {
     const gdPlugin = createGDScriptPlugin();
     this._registry.register(gdPlugin, { builtIn: true });
 
+    // Register built-in Python plugin
+    const pyPlugin = createPythonPlugin();
+    this._registry.register(pyPlugin, { builtIn: true });
+
+    // Register built-in C# plugin
+    const csPlugin = createCSharpPlugin();
+    this._registry.register(csPlugin, { builtIn: true });
     // Collect plugin colors
     for (const pluginInfo of this._registry.list()) {
       if (pluginInfo.plugin.fileColors) {
@@ -112,11 +121,18 @@ export class WorkspaceAnalyzer {
     // Discover ALL files (not filtered by extension)
     // Non-code files will appear as orphans if showOrphans is enabled
     const config = this._config.getAll();
+    
+    // Collect default exclude patterns from all plugins
+    const pluginExcludes = this._collectPluginExcludes();
+    
+    // Merge: plugin defaults + user settings (user patterns take precedence)
+    const mergedExclude = [...new Set([...pluginExcludes, ...config.exclude])];
+    
     const discoveryResult = await this._discovery.discover({
       rootPath: workspaceRoot,
       maxFiles: config.maxFiles,
       include: config.include,
-      exclude: config.exclude,
+      exclude: mergedExclude,
       respectGitignore: config.respectGitignore,
       // Don't filter by extensions - we want all files as nodes
     });
@@ -272,6 +288,22 @@ export class WorkspaceAnalyzer {
     );
 
     return { nodes, edges: filteredEdges };
+  }
+
+  /**
+   * Collects default exclude patterns from all registered plugins.
+   * These are merged with user settings during file discovery.
+   */
+  private _collectPluginExcludes(): string[] {
+    const excludes: string[] = [];
+    
+    for (const pluginInfo of this._registry.list()) {
+      if (pluginInfo.plugin.defaultExclude) {
+        excludes.push(...pluginInfo.plugin.defaultExclude);
+      }
+    }
+    
+    return excludes;
   }
 
   /**

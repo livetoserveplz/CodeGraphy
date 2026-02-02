@@ -202,6 +202,9 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark' }: G
   const selectedNodesRef = useRef(selectedNodes);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   
+  // Context menu target (set synchronously on right-click)
+  const contextTargetRef = useRef<string[]>([]);
+  
   // Tooltip state
   const [tooltipData, setTooltipData] = useState<{
     visible: boolean;
@@ -224,7 +227,8 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark' }: G
    * Handle context menu actions
    */
   const handleContextAction = useCallback((action: string, paths?: string[]) => {
-    const targetPaths = paths || selectedNodes;
+    // Use contextTargetRef (set at click time) to avoid React state timing issues
+    const targetPaths = paths || contextTargetRef.current;
     
     switch (action) {
       case 'open':
@@ -287,7 +291,7 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark' }: G
         postMessage({ type: 'CREATE_FILE', payload: { directory: '.' } });
         break;
     }
-  }, [selectedNodes]);
+  }, []); // contextTargetRef is stable, no deps needed
 
   /**
    * Listen for commands from the extension
@@ -449,23 +453,9 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark' }: G
       }
     });
 
-    // Handle right-click for context menu
-    network.on('oncontext', (params) => {
-      params.event.preventDefault();
-      const nodeId = network.getNodeAt(params.pointer.DOM) as string | undefined;
-      
-      if (nodeId) {
-        // Right-clicked on a node
-        if (!selectedNodesRef.current.includes(nodeId)) {
-          network.selectNodes([nodeId]);
-          setSelectedNodes([nodeId]);
-        }
-        setIsBackgroundContext(false);
-      } else {
-        // Right-clicked on background
-        setIsBackgroundContext(true);
-      }
-    });
+    // Note: Context menu logic is handled by onContextMenu on the container div
+    // This fires before Radix opens the menu, fixing the timing issue where
+    // first Ctrl+click showed background menu instead of node menu.
 
     // Handle hover for highlighting connected nodes and tooltips
     network.on('hoverNode', (params) => {
@@ -680,8 +670,52 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark' }: G
     }
   }, [hoveredNode, data, favorites, theme]);
 
-  const isMultiSelect = selectedNodes.length > 1;
-  const allFavorited = selectedNodes.every(id => favorites.has(id));
+  /**
+   * Handle context menu trigger - captures node BEFORE Radix opens menu
+   * 
+   * Both right-click and Ctrl+click should behave the same way:
+   * - Context menu is based on what's under the mouse, NOT what's selected
+   * - Node under mouse → node menu for that node
+   * - Background → background menu
+   * - No multi-select via Ctrl+click (use Shift+click/drag for that)
+   */
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    const network = networkRef.current;
+    const container = containerRef.current;
+    if (!network || !container) return;
+
+    // Get pointer position relative to the container
+    const rect = container.getBoundingClientRect();
+    const domPoint = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    const nodeId = network.getNodeAt(domPoint) as string | undefined;
+
+    // Both right-click and Ctrl+click behave the same:
+    // Menu is based on what's under the mouse
+    if (nodeId) {
+      // Clicked on a node - show node menu for this specific node
+      if (!selectedNodesRef.current.includes(nodeId)) {
+        // Node not in selection: select just this one
+        network.selectNodes([nodeId]);
+        setSelectedNodes([nodeId]);
+        contextTargetRef.current = [nodeId];
+      } else {
+        // Node already selected: use current selection
+        contextTargetRef.current = [...selectedNodesRef.current];
+      }
+      setIsBackgroundContext(false);
+    } else {
+      // Clicked on background - show background menu
+      contextTargetRef.current = [];
+      setIsBackgroundContext(true);
+    }
+  }, []);
+
+  // Use contextTargetRef for menu display (set synchronously on right-click)
+  // For node menus, use the context target (what's under the mouse)
+  // For background menus, contextTargetRef is empty and that's correct
+  const menuTargets = contextTargetRef.current;
+  const isMultiSelect = menuTargets.length > 1;
+  const allFavorited = menuTargets.length > 0 && menuTargets.every(id => favorites.has(id));
 
   const isLight = theme === 'light';
   const bgColor = isLight ? '#f5f5f5' : '#18181b';
@@ -692,10 +726,10 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark' }: G
       <ContextMenuTrigger asChild>
         <div
           ref={containerRef}
-          className="absolute inset-0 rounded-lg m-1"
+          onContextMenu={handleContextMenu}
+          className="absolute inset-0 rounded-lg m-1 outline-none focus:outline-none"
           style={{ backgroundColor: bgColor, borderWidth: 1, borderStyle: 'solid', borderColor }}
           tabIndex={0}
-          onContextMenu={(e) => e.preventDefault()}
         />
       </ContextMenuTrigger>
       
@@ -719,7 +753,7 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark' }: G
           // Node context menu
           <>
             <ContextMenuItem onClick={() => handleContextAction('open')}>
-              {isMultiSelect ? `Open ${selectedNodes.length} Files` : 'Open File'}
+              {isMultiSelect ? `Open ${menuTargets.length} Files` : 'Open File'}
             </ContextMenuItem>
             
             {!isMultiSelect && (
@@ -773,7 +807,7 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark' }: G
               className="text-red-400 focus:text-red-300"
               onClick={() => handleContextAction('delete')}
             >
-              {isMultiSelect ? `Delete ${selectedNodes.length} Files` : 'Delete File'}
+              {isMultiSelect ? `Delete ${menuTargets.length} Files` : 'Delete File'}
             </ContextMenuItem>
           </>
         )}

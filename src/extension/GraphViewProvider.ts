@@ -465,15 +465,34 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
-   * Opens VSCode's rename dialog for a file.
+   * Renames a file with an input dialog (stays in CodeGraphy view).
    */
   private async _renameFile(filePath: string): Promise<void> {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) return;
 
-    const fileUri = vscode.Uri.joinPath(workspaceFolder.uri, filePath);
-    await vscode.commands.executeCommand('revealInExplorer', fileUri);
-    await vscode.commands.executeCommand('renameFile');
+    const oldUri = vscode.Uri.joinPath(workspaceFolder.uri, filePath);
+    const oldName = filePath.split('/').pop() || filePath;
+    
+    const newName = await vscode.window.showInputBox({
+      prompt: 'Enter new file name',
+      value: oldName,
+      valueSelection: [0, oldName.lastIndexOf('.') > 0 ? oldName.lastIndexOf('.') : oldName.length],
+      ignoreFocusOut: true, // Prevent dialog from closing on mouse move or focus loss
+    });
+
+    if (!newName || newName === oldName) return;
+
+    const newPath = filePath.replace(/[^/]+$/, newName);
+    const newUri = vscode.Uri.joinPath(workspaceFolder.uri, newPath);
+
+    try {
+      await vscode.workspace.fs.rename(oldUri, newUri);
+      // Refresh graph after rename
+      await this._analyzeAndSendData();
+    } catch (error) {
+      vscode.window.showErrorMessage(`Failed to rename: ${error}`);
+    }
   }
 
   /**
@@ -486,6 +505,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
     const fileName = await vscode.window.showInputBox({
       prompt: 'Enter file name',
       placeHolder: 'newfile.ts',
+      ignoreFocusOut: true, // Prevent dialog from closing on mouse move or focus loss
     });
 
     if (fileName) {
