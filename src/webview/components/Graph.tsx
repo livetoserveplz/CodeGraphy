@@ -233,6 +233,8 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark' }: G
     switch (action) {
       case 'open':
         targetPaths.forEach(path => {
+          // Clear cache so visit count is refreshed on next hover
+          fileInfoCacheRef.current.delete(path);
           postMessage({ type: 'OPEN_FILE', payload: { path } });
         });
         break;
@@ -366,6 +368,8 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark' }: G
           if (selectedNodes.length > 0) {
             event.preventDefault();
             selectedNodes.forEach(nodeId => {
+              // Clear cache so visit count is refreshed on next hover
+              fileInfoCacheRef.current.delete(nodeId);
               postMessage({ type: 'NODE_DOUBLE_CLICKED', payload: { nodeId } });
             });
           }
@@ -449,6 +453,8 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark' }: G
     network.on('doubleClick', (params) => {
       if (params.nodes.length > 0) {
         const nodeId = params.nodes[0] as string;
+        // Clear cache so visit count is refreshed on next hover
+        fileInfoCacheRef.current.delete(nodeId);
         postMessage({ type: 'NODE_DOUBLE_CLICKED', payload: { nodeId } });
       }
     });
