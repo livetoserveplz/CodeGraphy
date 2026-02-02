@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import Graph from './components/Graph';
 import GraphIcon from './components/GraphIcon';
 import PhysicsSettings from './components/PhysicsSettings';
-import { IGraphData, IPhysicsSettings, ExtensionToWebviewMessage, WebviewToExtensionMessage } from '../shared/types';
+import { IGraphData, IPhysicsSettings, ExtensionToWebviewMessage } from '../shared/types';
+import { getVsCodeApi } from './vscodeApi';
 
 /** Default physics settings */
 const DEFAULT_PHYSICS: IPhysicsSettings = {
@@ -12,24 +13,6 @@ const DEFAULT_PHYSICS: IPhysicsSettings = {
   damping: 0.4,
   centralGravity: 0.01,
 };
-
-// Get VSCode API if available (must be called exactly once at module level)
-declare function acquireVsCodeApi(): {
-  postMessage: (message: WebviewToExtensionMessage) => void;
-  getState: () => unknown;
-  setState: (state: unknown) => void;
-};
-
-// Acquire the API once at module load (VSCode requirement)
-let vscode: ReturnType<typeof acquireVsCodeApi> | null = null;
-try {
-  if (typeof acquireVsCodeApi !== 'undefined') {
-    vscode = acquireVsCodeApi();
-  }
-} catch {
-  // Already acquired or not in VSCode context
-  vscode = null;
-}
 
 export default function App(): React.ReactElement {
   const [graphData, setGraphData] = useState<IGraphData | null>(null);
@@ -58,6 +41,7 @@ export default function App(): React.ReactElement {
     window.addEventListener('message', handleMessage);
 
     // Tell extension we're ready to receive data
+    const vscode = getVsCodeApi();
     if (vscode) {
       vscode.postMessage({ type: 'WEBVIEW_READY', payload: null });
     }
