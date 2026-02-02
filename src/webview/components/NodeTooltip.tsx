@@ -71,13 +71,39 @@ export function NodeTooltip({
 }: NodeTooltipProps): React.ReactElement | null {
   if (!visible) return null;
 
-  // Position tooltip to avoid going off-screen
+  // Tooltip dimensions (approximate, actual size may vary)
+  const tooltipWidth = 300;
+  const tooltipHeight = 150;
+  const padding = 10;
+
+  // Get viewport dimensions
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+
+  // Calculate position, keeping tooltip within viewport
+  let left = position.x + padding;
+  let top = position.y + padding;
+
+  // Check right edge - if tooltip would overflow, position to left of cursor
+  if (left + tooltipWidth > viewportWidth - padding) {
+    left = position.x - tooltipWidth - padding;
+  }
+
+  // Check bottom edge - if tooltip would overflow, position above cursor
+  if (top + tooltipHeight > viewportHeight - padding) {
+    top = position.y - tooltipHeight - padding;
+  }
+
+  // Ensure tooltip doesn't go off left or top edges
+  left = Math.max(padding, left);
+  top = Math.max(padding, top);
+
   const tooltipStyle: React.CSSProperties = {
     position: 'fixed',
-    left: position.x + 10,
-    top: position.y + 10,
+    left,
+    top,
     zIndex: 1000,
-    maxWidth: 300,
+    maxWidth: tooltipWidth,
   };
 
   return (
@@ -128,14 +154,12 @@ export function NodeTooltip({
         </div>
 
         {/* Visits */}
-        {visits !== undefined && visits > 0 && (
-          <div className="flex justify-between gap-4">
-            <span>Visits:</span>
-            <span className="text-[var(--vscode-editorHoverWidget-foreground,#cccccc)]">
-              {visits}
-            </span>
-          </div>
-        )}
+        <div className="flex justify-between gap-4">
+          <span>Visits:</span>
+          <span className="text-[var(--vscode-editorHoverWidget-foreground,#cccccc)]">
+            {visits ?? 0}
+          </span>
+        </div>
 
         {/* Plugin */}
         {plugin && (
