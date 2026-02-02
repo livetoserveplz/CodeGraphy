@@ -12,6 +12,8 @@ import {
   WebviewToExtensionMessage,
 } from '../shared/types';
 import { WorkspaceAnalyzer } from './WorkspaceAnalyzer';
+import { getUndoManager } from './UndoManager';
+import { ToggleFavoriteAction, AddToExcludeAction } from './actions';
 
 /** Storage key for persisted node positions in workspace state */
 const POSITIONS_KEY = 'codegraphy.nodePositions';
@@ -215,6 +217,36 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
    */
   public sendCommand(command: 'FIT_VIEW' | 'ZOOM_IN' | 'ZOOM_OUT'): void {
     this._sendMessage({ type: command });
+  }
+
+  /**
+   * Undoes the last action.
+   * @returns Description of undone action, or undefined if nothing to undo
+   */
+  public async undo(): Promise<string | undefined> {
+    return getUndoManager().undo();
+  }
+
+  /**
+   * Redoes the last undone action.
+   * @returns Description of redone action, or undefined if nothing to redo
+   */
+  public async redo(): Promise<string | undefined> {
+    return getUndoManager().redo();
+  }
+
+  /**
+   * Checks if undo is available.
+   */
+  public canUndo(): boolean {
+    return getUndoManager().canUndo();
+  }
+
+  /**
+   * Checks if redo is available.
+   */
+  public canRedo(): boolean {
+    return getUndoManager().canRedo();
   }
 
   /**
@@ -525,22 +557,11 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
-   * Toggles favorite status for files.
+   * Toggles favorite status for files (with undo support).
    */
   private async _toggleFavorites(paths: string[]): Promise<void> {
-    const config = vscode.workspace.getConfiguration('codegraphy');
-    const favorites = new Set<string>(config.get<string[]>('favorites', []));
-
-    for (const path of paths) {
-      if (favorites.has(path)) {
-        favorites.delete(path);
-      } else {
-        favorites.add(path);
-      }
-    }
-
-    await config.update('favorites', Array.from(favorites), vscode.ConfigurationTarget.Workspace);
-    this._sendFavorites();
+    const action = new ToggleFavoriteAction(paths, () => this._sendFavorites());
+    await getUndoManager().execute(action);
   }
 
   /**
@@ -553,20 +574,11 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
-   * Adds patterns to the exclude list.
+   * Adds patterns to the exclude list (with undo support).
    */
   private async _addToExclude(patterns: string[]): Promise<void> {
-    const config = vscode.workspace.getConfiguration('codegraphy');
-    const currentExclude = config.get<string[]>('exclude', []);
-    
-    // Convert file paths to glob patterns
-    const newPatterns = patterns.map(p => `**/${p}`);
-    const mergedExclude = [...new Set([...currentExclude, ...newPatterns])];
-
-    await config.update('exclude', mergedExclude, vscode.ConfigurationTarget.Workspace);
-    
-    // Refresh graph after adding excludes
-    await this._analyzeAndSendData();
+    const action = new AddToExcludeAction(patterns, () => this._analyzeAndSendData());
+    await getUndoManager().execute(action);
   }
 
   /**

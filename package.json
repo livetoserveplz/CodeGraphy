@@ -37,6 +37,14 @@
       {
         "command": "codegraphy.zoomOut",
         "title": "CodeGraphy: Zoom Out"
+      },
+      {
+        "command": "codegraphy.undo",
+        "title": "CodeGraphy: Undo"
+      },
+      {
+        "command": "codegraphy.redo",
+        "title": "CodeGraphy: Redo"
       }
     ],
     "keybindings": [
@@ -59,6 +67,23 @@
         "command": "codegraphy.zoomOut",
         "key": "-",
         "when": "codegraphy.graphFocused"
+      },
+      {
+        "command": "codegraphy.undo",
+        "key": "ctrl+z",
+        "mac": "cmd+z",
+        "when": "focusedView == 'codegraphy.graphView'"
+      },
+      {
+        "command": "codegraphy.redo",
+        "key": "ctrl+shift+z",
+        "mac": "cmd+shift+z",
+        "when": "focusedView == 'codegraphy.graphView'"
+      },
+      {
+        "command": "codegraphy.redo",
+        "key": "ctrl+y",
+        "when": "focusedView == 'codegraphy.graphView'"
       }
     ],
     "viewsContainers": {
