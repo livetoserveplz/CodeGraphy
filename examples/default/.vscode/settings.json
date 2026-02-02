@@ -7,6 +7,7 @@
   ],
   "codegraphy.respectGitignore": true,
   "codegraphy.showOrphans": true,
+  "codegraphy.bidirectionalEdges": "separate",
   "codegraphy.favorites": ["index.html"],
   "codegraphy.fileColors": {
     ".html": "#E34F26",
