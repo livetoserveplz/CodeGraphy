@@ -154,6 +154,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
    */
   public async refresh(): Promise<void> {
     await this._analyzeAndSendData();
+    this._sendSettings();
   }
 
   /**
