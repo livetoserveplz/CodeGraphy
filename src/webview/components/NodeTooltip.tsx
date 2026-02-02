@@ -19,6 +19,8 @@ interface NodeTooltipProps {
   outgoingCount: number;
   /** Plugin that handles this file */
   plugin?: string;
+  /** Number of times this file has been visited/opened */
+  visits?: number;
   /** Position to show tooltip */
   position: { x: number; y: number };
   /** Whether tooltip is visible */
@@ -63,6 +65,7 @@ export function NodeTooltip({
   incomingCount,
   outgoingCount,
   plugin,
+  visits,
   position,
   visible,
 }: NodeTooltipProps): React.ReactElement | null {
@@ -123,6 +126,16 @@ export function NodeTooltip({
             {outgoingCount} imports • {incomingCount} imported by
           </span>
         </div>
+
+        {/* Visits */}
+        {visits !== undefined && visits > 0 && (
+          <div className="flex justify-between gap-4">
+            <span>Visits:</span>
+            <span className="text-[var(--vscode-editorHoverWidget-foreground,#cccccc)]">
+              {visits}
+            </span>
+          </div>
+        )}
 
         {/* Plugin */}
         {plugin && (

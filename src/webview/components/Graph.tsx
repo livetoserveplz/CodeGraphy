@@ -684,6 +684,13 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark' }: G
     const container = containerRef.current;
     if (!network || !container) return;
 
+    // Hide tooltip when opening context menu
+    if (tooltipTimeoutRef.current) {
+      clearTimeout(tooltipTimeoutRef.current);
+      tooltipTimeoutRef.current = null;
+    }
+    setTooltipData(prev => ({ ...prev, visible: false }));
+
     // Get pointer position relative to the container
     const rect = container.getBoundingClientRect();
     const domPoint = { x: e.clientX - rect.left, y: e.clientY - rect.top };
@@ -821,6 +828,7 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark' }: G
         incomingCount={tooltipData.info?.incomingCount ?? 0}
         outgoingCount={tooltipData.info?.outgoingCount ?? 0}
         plugin={tooltipData.info?.plugin}
+        visits={tooltipData.info?.visits}
         position={tooltipData.position}
         visible={tooltipData.visible}
       />

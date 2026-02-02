@@ -16,6 +16,9 @@ import { WorkspaceAnalyzer } from './WorkspaceAnalyzer';
 /** Storage key for persisted node positions in workspace state */
 const POSITIONS_KEY = 'codegraphy.nodePositions';
 
+/** Storage key for file visit counts in workspace state */
+const VISITS_KEY = 'codegraphy.fileVisits';
+
 /**
  * Map of node IDs to their persisted positions.
  * Stored in VSCode workspace state for persistence across sessions.
@@ -381,6 +384,9 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
 
       const document = await vscode.workspace.openTextDocument(fileUri);
       await vscode.window.showTextDocument(document);
+      
+      // Track visit
+      await this._incrementVisitCount(filePath);
     } catch (error) {
       console.error('[CodeGraphy] Failed to open file:', error);
       vscode.window.showErrorMessage(`Could not open file: ${filePath}`);
@@ -582,6 +588,9 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
         }
       }
 
+      // Get visit count
+      const visits = this._getVisitCount(filePath);
+
       this._sendMessage({
         type: 'FILE_INFO',
         payload: {
@@ -591,11 +600,29 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
           incomingCount,
           outgoingCount,
           plugin,
+          visits,
         },
       });
     } catch (error) {
       console.error('[CodeGraphy] Failed to get file info:', error);
     }
+  }
+
+  /**
+   * Gets the visit count for a file.
+   */
+  private _getVisitCount(filePath: string): number {
+    const visits = this._context.workspaceState.get<Record<string, number>>(VISITS_KEY) ?? {};
+    return visits[filePath] ?? 0;
+  }
+
+  /**
+   * Increments the visit count for a file.
+   */
+  private async _incrementVisitCount(filePath: string): Promise<void> {
+    const visits = this._context.workspaceState.get<Record<string, number>>(VISITS_KEY) ?? {};
+    visits[filePath] = (visits[filePath] ?? 0) + 1;
+    await this._context.workspaceState.update(VISITS_KEY, visits);
   }
 
   /**
