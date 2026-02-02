@@ -21,6 +21,10 @@ body {
   padding: 0;
 }
 
+.graph-container canvas:focus-visible {
+  outline: none !important;
+}
+
 @layer utilities {
   .text-primary {
     color: var(--vscode-foreground, var(--color-primary));
