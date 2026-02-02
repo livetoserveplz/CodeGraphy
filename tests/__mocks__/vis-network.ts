@@ -10,6 +10,14 @@ const networkInstances: Network[] = [];
 // Store what getNodeAt should return (for testing context menu behavior)
 let mockNodeAtPosition: string | undefined = undefined;
 
+// Store position-to-node mappings for more realistic testing
+const mockNodePositions: Map<string, string> = new Map();
+
+// Helper to create position key
+function posKey(x: number, y: number): string {
+  return `${x},${y}`;
+}
+
 // Mock Network class with event simulation support
 export class Network {
   private instanceHandlers: Map<string, EventHandler[]> = new Map();
@@ -68,8 +76,16 @@ export class Network {
 
   getSelectedNodes = vi.fn(() => [...this.selectedNodes]);
 
-  // Returns the mocked node at position (set via mockGetNodeAt)
-  getNodeAt = vi.fn((_position: { x: number; y: number }) => mockNodeAtPosition);
+  // Returns the mocked node at position (set via setMockNodeAtPosition or mockGetNodeAt)
+  getNodeAt = vi.fn((position: { x: number; y: number }) => {
+    // First check position-based mapping
+    const key = posKey(position.x, position.y);
+    if (mockNodePositions.has(key)) {
+      return mockNodePositions.get(key);
+    }
+    // Fall back to global mock
+    return mockNodeAtPosition;
+  });
 
   // Instance method to trigger events on this network
   triggerEvent(eventName: string, params: unknown) {
@@ -105,6 +121,23 @@ export class Network {
   // Static helper to mock what getNodeAt returns (for context menu tests)
   static mockGetNodeAt(nodeId: string | undefined) {
     mockNodeAtPosition = nodeId;
+  }
+
+  // Static helper to set a node at a specific position
+  static setMockNodeAtPosition(position: { x: number; y: number }, nodeId: string) {
+    mockNodePositions.set(posKey(position.x, position.y), nodeId);
+  }
+
+  // Static helper to clear position mocks
+  static clearMockPositions() {
+    mockNodePositions.clear();
+    mockNodeAtPosition = undefined;
+  }
+
+  // Static helper to get the handler for an event
+  static getHandler(eventName: string): EventHandler | undefined {
+    const handlers = globalEventHandlers.get(eventName);
+    return handlers && handlers.length > 0 ? handlers[0] : undefined;
   }
 }
 

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, act } from '@testing-library/react';
+import { render, act, screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import Graph from '../../src/webview/components/Graph';
 import { IGraphData } from '../../src/shared/types';
 import { Network } from 'vis-network';
@@ -188,5 +189,277 @@ describe('Bug #39: Ctrl+click context menu behavior', () => {
     
     // No errors means handler executed successfully
     // Ctrl+click on a node should show node menu, not background menu
+  });
+});
+
+describe('Context Menu Content and Actions', () => {
+  const mockData: IGraphData = {
+    nodes: [
+      { id: 'src/app.ts', label: 'app.ts', color: '#93C5FD' },
+      { id: 'src/utils.ts', label: 'utils.ts', color: '#67E8F9' },
+    ],
+    edges: [{ id: 'src/app.ts->src/utils.ts', from: 'src/app.ts', to: 'src/utils.ts' }],
+  };
+
+  const mockFavorites = new Set(['src/app.ts']);
+
+  beforeEach(() => {
+    clearSentMessages();
+    Network.clearAllHandlers();
+    // Configure mock to return node at specific position
+    Network.setMockNodeAtPosition({ x: 100, y: 100 }, 'src/app.ts');
+    Network.setMockNodeAtPosition({ x: 200, y: 200 }, 'src/utils.ts');
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+    Network.clearMockPositions();
+  });
+
+  it('should show background menu items when right-clicking empty space', async () => {
+    const { container } = render(<Graph data={mockData} />);
+    const graphContainer = container.querySelector('[tabindex="0"]');
+    
+    // Right-click on empty space (no node at position 300, 300)
+    await act(async () => {
+      fireEvent.contextMenu(graphContainer!, { clientX: 300, clientY: 300 });
+    });
+
+    // Wait for menu to appear
+    await waitFor(() => {
+      expect(screen.getByText('New File...')).toBeInTheDocument();
+    });
+
+    // Verify background menu items
+    expect(screen.getByText('Refresh Graph')).toBeInTheDocument();
+    expect(screen.getByText('Fit All Nodes')).toBeInTheDocument();
+    
+    // Node-specific items should NOT be present
+    expect(screen.queryByText('Open File')).not.toBeInTheDocument();
+    expect(screen.queryByText('Reveal in Explorer')).not.toBeInTheDocument();
+  });
+
+  it('should show node menu items when right-clicking a node', async () => {
+    const { container } = render(<Graph data={mockData} />);
+    const graphContainer = container.querySelector('[tabindex="0"]');
+    
+    // Right-click on node position
+    await act(async () => {
+      fireEvent.contextMenu(graphContainer!, { clientX: 100, clientY: 100 });
+    });
+
+    // Wait for menu to appear
+    await waitFor(() => {
+      expect(screen.getByText('Open File')).toBeInTheDocument();
+    });
+
+    // Verify node menu items
+    expect(screen.getByText('Reveal in Explorer')).toBeInTheDocument();
+    expect(screen.getByText('Copy Relative Path')).toBeInTheDocument();
+    expect(screen.getByText('Copy Absolute Path')).toBeInTheDocument();
+    expect(screen.getByText('Focus Node')).toBeInTheDocument();
+    expect(screen.getByText('Add to Exclude')).toBeInTheDocument();
+    expect(screen.getByText('Rename...')).toBeInTheDocument();
+    expect(screen.getByText('Delete File')).toBeInTheDocument();
+    
+    // Background items should NOT be present
+    expect(screen.queryByText('New File...')).not.toBeInTheDocument();
+    expect(screen.queryByText('Refresh Graph')).not.toBeInTheDocument();
+  });
+
+  it('should show "Remove from Favorites" for favorited nodes', async () => {
+    const { container } = render(<Graph data={mockData} favorites={mockFavorites} />);
+    const graphContainer = container.querySelector('[tabindex="0"]');
+    
+    // Right-click on favorited node (app.ts at 100,100)
+    await act(async () => {
+      fireEvent.contextMenu(graphContainer!, { clientX: 100, clientY: 100 });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Remove from Favorites')).toBeInTheDocument();
+    });
+  });
+
+  it('should show "Add to Favorites" for non-favorited nodes', async () => {
+    const { container } = render(<Graph data={mockData} favorites={mockFavorites} />);
+    const graphContainer = container.querySelector('[tabindex="0"]');
+    
+    // Right-click on non-favorited node (utils.ts at 200,200)
+    await act(async () => {
+      fireEvent.contextMenu(graphContainer!, { clientX: 200, clientY: 200 });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Add to Favorites')).toBeInTheDocument();
+    });
+  });
+
+  it('should send OPEN_FILE message when clicking Open File', async () => {
+    const { container } = render(<Graph data={mockData} />);
+    const graphContainer = container.querySelector('[tabindex="0"]');
+    
+    // Right-click on node
+    await act(async () => {
+      fireEvent.contextMenu(graphContainer!, { clientX: 100, clientY: 100 });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Open File')).toBeInTheDocument();
+    });
+
+    // Click the menu item
+    await act(async () => {
+      fireEvent.click(screen.getByText('Open File'));
+    });
+
+    // Verify message was sent
+    const messages = getSentMessages();
+    const openMsg = messages.find((m: { type: string }) => m.type === 'OPEN_FILE');
+    expect(openMsg).toBeTruthy();
+    expect((openMsg as { payload: { path: string } }).payload.path).toBe('src/app.ts');
+  });
+
+  it('should send TOGGLE_FAVORITE message when clicking favorite option', async () => {
+    const { container } = render(<Graph data={mockData} />);
+    const graphContainer = container.querySelector('[tabindex="0"]');
+    
+    // Right-click on node
+    await act(async () => {
+      fireEvent.contextMenu(graphContainer!, { clientX: 100, clientY: 100 });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Add to Favorites')).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Add to Favorites'));
+    });
+
+    const messages = getSentMessages();
+    const favMsg = messages.find((m: { type: string }) => m.type === 'TOGGLE_FAVORITE');
+    expect(favMsg).toBeTruthy();
+    expect((favMsg as { payload: { paths: string[] } }).payload.paths).toContain('src/app.ts');
+  });
+
+  it('should send REFRESH_GRAPH message when clicking Refresh Graph', async () => {
+    const { container } = render(<Graph data={mockData} />);
+    const graphContainer = container.querySelector('[tabindex="0"]');
+    
+    // Right-click on empty space
+    await act(async () => {
+      fireEvent.contextMenu(graphContainer!, { clientX: 300, clientY: 300 });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Refresh Graph')).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Refresh Graph'));
+    });
+
+    const messages = getSentMessages();
+    expect(messages.find((m: { type: string }) => m.type === 'REFRESH_GRAPH')).toBeTruthy();
+  });
+
+  it('should send DELETE_FILES message when clicking Delete File', async () => {
+    const { container } = render(<Graph data={mockData} />);
+    const graphContainer = container.querySelector('[tabindex="0"]');
+    
+    await act(async () => {
+      fireEvent.contextMenu(graphContainer!, { clientX: 100, clientY: 100 });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Delete File')).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Delete File'));
+    });
+
+    const messages = getSentMessages();
+    const deleteMsg = messages.find((m: { type: string }) => m.type === 'DELETE_FILES');
+    expect(deleteMsg).toBeTruthy();
+    expect((deleteMsg as { payload: { paths: string[] } }).payload.paths).toContain('src/app.ts');
+  });
+});
+
+describe('Context Menu: Mouse Position vs Selection (Bug Fix)', () => {
+  const mockData: IGraphData = {
+    nodes: [
+      { id: 'nodeA.ts', label: 'nodeA.ts', color: '#93C5FD' },
+      { id: 'nodeB.ts', label: 'nodeB.ts', color: '#67E8F9' },
+    ],
+    edges: [],
+  };
+
+  beforeEach(() => {
+    clearSentMessages();
+    Network.clearAllHandlers();
+    Network.setMockNodeAtPosition({ x: 100, y: 100 }, 'nodeA.ts');
+    Network.setMockNodeAtPosition({ x: 200, y: 200 }, 'nodeB.ts');
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+    Network.clearMockPositions();
+  });
+
+  /**
+   * Critical bug fix test: Context menu should be based on mouse position,
+   * NOT on what's currently selected. If node A is selected and you 
+   * right-click on the background, you should get background menu.
+   */
+  it('should show background menu when right-clicking background even if node is selected', async () => {
+    const { container } = render(<Graph data={mockData} />);
+    const graphContainer = container.querySelector('[tabindex="0"]');
+    
+    // First, select nodeA by clicking on it
+    await act(async () => {
+      // Trigger the select handler through vis-network mock
+      const selectHandler = Network.getHandler('select');
+      if (selectHandler) {
+        selectHandler({ nodes: ['nodeA.ts'], edges: [] });
+      }
+    });
+
+    // Now right-click on empty background (not on any node)
+    await act(async () => {
+      fireEvent.contextMenu(graphContainer!, { clientX: 500, clientY: 500 });
+    });
+
+    // Should show BACKGROUND menu, not node menu
+    await waitFor(() => {
+      expect(screen.getByText('New File...')).toBeInTheDocument();
+    });
+    
+    // Node-specific items should NOT appear
+    expect(screen.queryByText('Open File')).not.toBeInTheDocument();
+  });
+
+  it('should show node menu for clicked node even if different node is selected', async () => {
+    const { container } = render(<Graph data={mockData} />);
+    const graphContainer = container.querySelector('[tabindex="0"]');
+    
+    // Select nodeA
+    await act(async () => {
+      const selectHandler = Network.getHandler('select');
+      if (selectHandler) {
+        selectHandler({ nodes: ['nodeA.ts'], edges: [] });
+      }
+    });
+
+    // Right-click on nodeB (different node)
+    await act(async () => {
+      fireEvent.contextMenu(graphContainer!, { clientX: 200, clientY: 200 });
+    });
+
+    // Should show node menu
+    await waitFor(() => {
+      expect(screen.getByText('Open File')).toBeInTheDocument();
+    });
   });
 });
