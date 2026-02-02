@@ -536,8 +536,9 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
   }, []);
 
   // Use contextTargetRef for menu display (set synchronously on right-click)
-  // Fall back to selectedNodes if context target is empty
-  const menuTargets = contextTargetRef.current.length > 0 ? contextTargetRef.current : selectedNodes;
+  // For node menus, use the context target (what's under the mouse)
+  // For background menus, contextTargetRef is empty and that's correct
+  const menuTargets = contextTargetRef.current;
   const isMultiSelect = menuTargets.length > 1;
   const allFavorited = menuTargets.length > 0 && menuTargets.every(id => favorites.has(id));
 
