@@ -493,7 +493,12 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
 
   /**
    * Handle context menu trigger - captures node BEFORE Radix opens menu
-   * This fixes the bug where first Ctrl+click showed background menu
+   * 
+   * Both right-click and Ctrl+click should behave the same way:
+   * - Context menu is based on what's under the mouse, NOT what's selected
+   * - Node under mouse → node menu for that node
+   * - Background → background menu
+   * - No multi-select via Ctrl+click (use Shift+click/drag for that)
    */
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     const network = networkRef.current;
@@ -505,33 +510,24 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
     const domPoint = { x: e.clientX - rect.left, y: e.clientY - rect.top };
     const nodeId = network.getNodeAt(domPoint) as string | undefined;
 
-    // Check if this is Ctrl+click (Mac-style multi-select context menu)
-    const isCtrlClick = e.ctrlKey && !e.metaKey;
-
+    // Both right-click and Ctrl+click behave the same:
+    // Menu is based on what's under the mouse
     if (nodeId) {
-      if (isCtrlClick) {
-        // Ctrl+click on node: add to selection for context target
-        const newTarget = selectedNodesRef.current.includes(nodeId)
-          ? [...selectedNodesRef.current]
-          : [...selectedNodesRef.current, nodeId];
-        contextTargetRef.current = newTarget;
+      // Clicked on a node - show node menu for this specific node
+      if (!selectedNodesRef.current.includes(nodeId)) {
+        // Node not in selection: select just this one
+        network.selectNodes([nodeId]);
+        setSelectedNodes([nodeId]);
+        contextTargetRef.current = [nodeId];
       } else {
-        // Normal right-click on node
-        if (!selectedNodesRef.current.includes(nodeId)) {
-          // Unselected node: select just this one
-          network.selectNodes([nodeId]);
-          setSelectedNodes([nodeId]);
-          contextTargetRef.current = [nodeId];
-        } else {
-          // Already selected: use current selection
-          contextTargetRef.current = [...selectedNodesRef.current];
-        }
+        // Node already selected: use current selection
+        contextTargetRef.current = [...selectedNodesRef.current];
       }
       setIsBackgroundContext(false);
     } else {
-      // Clicked on background
-      contextTargetRef.current = isCtrlClick ? [...selectedNodesRef.current] : [];
-      setIsBackgroundContext(!isCtrlClick || selectedNodesRef.current.length === 0);
+      // Clicked on background - show background menu
+      contextTargetRef.current = [];
+      setIsBackgroundContext(true);
     }
   }, []);
 
@@ -548,7 +544,7 @@ export default function Graph({ data, favorites = new Set() }: GraphProps): Reac
         <div
           ref={containerRef}
           onContextMenu={handleContextMenu}
-          className="absolute inset-0 rounded-lg border border-zinc-700 m-1"
+          className="absolute inset-0 rounded-lg border border-zinc-700 m-1 outline-none focus:outline-none"
           style={{ backgroundColor: '#18181b' }}
           tabIndex={0}
         />

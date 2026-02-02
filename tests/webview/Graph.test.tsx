@@ -169,12 +169,13 @@ describe('Bug #39: Ctrl+click context menu behavior', () => {
     // The actual menu display is handled by Radix
   });
 
-  it('should handle Ctrl+click context menu via React onContextMenu', async () => {
+  it('should handle Ctrl+click context menu same as right-click', async () => {
     const { container } = render(<Graph data={mockData} />);
     const graphContainer = container.querySelector('[tabindex="0"]');
     expect(graphContainer).toBeTruthy();
     
-    // Simulate Ctrl+click (Mac multi-select style context menu)
+    // Simulate Ctrl+click - should behave same as right-click
+    // (no multi-select, menu based on mouse position)
     await act(async () => {
       const event = new MouseEvent('contextmenu', {
         bubbles: true,
@@ -188,7 +189,7 @@ describe('Bug #39: Ctrl+click context menu behavior', () => {
     });
     
     // No errors means handler executed successfully
-    // Ctrl+click on a node should show node menu, not background menu
+    // Ctrl+click behaves same as right-click: menu based on mouse position
   });
 });
 
@@ -461,5 +462,40 @@ describe('Context Menu: Mouse Position vs Selection (Bug Fix)', () => {
     await waitFor(() => {
       expect(screen.getByText('Open File')).toBeInTheDocument();
     });
+  });
+
+  /**
+   * Ctrl+click should behave exactly like right-click.
+   * This means: no multi-select, menu based on mouse position.
+   */
+  it('should show background menu when Ctrl+clicking background even if node is selected', async () => {
+    const { container } = render(<Graph data={mockData} />);
+    const graphContainer = container.querySelector('[tabindex="0"]');
+    
+    // First, select nodeA
+    await act(async () => {
+      const selectHandler = Network.getHandler('select');
+      if (selectHandler) {
+        selectHandler({ nodes: ['nodeA.ts'], edges: [] });
+      }
+    });
+
+    // Ctrl+click on empty background (not on any node)
+    await act(async () => {
+      fireEvent.contextMenu(graphContainer!, { 
+        clientX: 500, 
+        clientY: 500,
+        ctrlKey: true,
+      });
+    });
+
+    // Should show BACKGROUND menu, not node menu
+    // Ctrl+click behaves same as right-click
+    await waitFor(() => {
+      expect(screen.getByText('New File...')).toBeInTheDocument();
+    });
+    
+    // Node-specific items should NOT appear
+    expect(screen.queryByText('Open File')).not.toBeInTheDocument();
   });
 });
