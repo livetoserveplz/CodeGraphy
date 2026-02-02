@@ -8,6 +8,7 @@
   "codegraphy.respectGitignore": true,
   "codegraphy.showOrphans": true,
   "codegraphy.favorites": ["index.html"],
+  "codegraphy.nodeSizeBy": "connections",
   "codegraphy.fileColors": {
     ".html": "#E34F26",
     ".css": "#1572B6",

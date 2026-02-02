@@ -12,6 +12,7 @@ CodeGraphy provides several settings to customize its behavior. Configure these 
 | `codegraphy.respectGitignore` | boolean | `true` | Honor .gitignore patterns |
 | `codegraphy.showOrphans` | boolean | `true` | Show files with no connections |
 | `codegraphy.favorites` | string[] | `[]` | Favorite file paths (highlighted with yellow border) |
+| `codegraphy.nodeSizeBy` | string | `"connections"` | What determines node size (`connections`, `file-size`, `access-count`, `uniform`) |
 | `codegraphy.plugins` | string[] | `[]` | Paths to external plugins |
 | `codegraphy.fileColors` | object | `{}` | Custom colors for file extensions |
 | `codegraphy.physics.gravitationalConstant` | number | `-50` | Gravity strength (more negative = stronger pull) |
@@ -152,6 +153,54 @@ Favorites persist across sessions and are useful for:
 - Highlighting entry points
 - Marking frequently-edited files
 - Creating visual anchors in large graphs
+
+### `codegraphy.nodeSizeBy`
+
+Controls what determines the size of nodes in the graph visualization.
+
+```json
+{
+  "codegraphy.nodeSizeBy": "connections"
+}
+```
+
+**Available modes:**
+
+| Mode | Description |
+|------|-------------|
+| `connections` | More connections = larger node (default) |
+| `file-size` | Larger files = larger nodes (uses logarithmic scale) |
+| `access-count` | Frequently opened files = larger nodes (placeholder) |
+| `uniform` | All nodes have the same size |
+
+**Mode details:**
+
+- **`connections`** — Nodes with more imports/exports appear larger. Useful for identifying hub files and entry points.
+
+- **`file-size`** — Node size reflects the file's byte size. Uses a logarithmic scale to handle large variance between files. Useful for spotting large files that might need refactoring.
+
+- **`access-count`** — Intended to make frequently-opened files larger. Currently a placeholder that falls back to `connections` mode until visit tracking is implemented.
+
+- **`uniform`** — All nodes display at the same size. Useful when you want to focus on connections without visual weight differences.
+
+**Size range:**
+- Minimum size: 10
+- Maximum size: 40
+- Default size: 16
+
+**Example — Identify large files:**
+```json
+{
+  "codegraphy.nodeSizeBy": "file-size"
+}
+```
+
+**Example — Clean uniform look:**
+```json
+{
+  "codegraphy.nodeSizeBy": "uniform"
+}
+```
 
 ### `codegraphy.plugins`
 

@@ -11,6 +11,7 @@
   "codegraphy.respectGitignore": true,
   "codegraphy.showOrphans": true,
   "codegraphy.favorites": ["src/index.ts"],
+  "codegraphy.nodeSizeBy": "file-size",
   "codegraphy.plugins": [],
   // Custom file colors (overrides plugin/generated colors)
   "codegraphy.fileColors": {
