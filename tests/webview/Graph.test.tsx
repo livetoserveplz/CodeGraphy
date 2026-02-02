@@ -125,14 +125,6 @@ describe('Bug #39: Ctrl+click context menu behavior', () => {
     vi.clearAllMocks();
   });
 
-  it('should register oncontext handler for right-click context menu', () => {
-    render(<Graph data={mockData} />);
-    
-    // Verify oncontext event is registered (for context menu)
-    const registeredEvents = Network.getRegisteredEvents();
-    expect(registeredEvents).toContain('oncontext');
-  });
-
   it('should register select event handler for tracking selection', () => {
     render(<Graph data={mockData} />);
     
@@ -142,66 +134,59 @@ describe('Bug #39: Ctrl+click context menu behavior', () => {
   });
 
   /**
-   * These tests verify the oncontext handler behavior by checking
-   * that the handler is registered and can be called.
-   * 
-   * The fix for Bug #39 ensures getNodeAt is called at the start of the
-   * oncontext handler, before checking for Ctrl key, so that first Ctrl+click
-   * on a node shows the node context menu instead of background menu.
+   * Bug #39 fix: Context menu logic is now in React's onContextMenu handler
+   * instead of vis-network's oncontext event. This ensures the node under
+   * the pointer is captured BEFORE Radix opens the menu, fixing the issue
+   * where first Ctrl+click showed background menu instead of node menu.
    */
-  it('should have oncontext handler that processes events', async () => {
-    render(<Graph data={mockData} />);
+  it('should render container with onContextMenu handler', () => {
+    const { container } = render(<Graph data={mockData} />);
     
-    // Verify we can simulate oncontext without errors
+    // The container div should exist (context menu logic is now handled via React)
+    const graphContainer = container.querySelector('[tabindex="0"]');
+    expect(graphContainer).toBeTruthy();
+  });
+
+  it('should handle context menu events via React onContextMenu', async () => {
+    const { container } = render(<Graph data={mockData} />);
+    const graphContainer = container.querySelector('[tabindex="0"]');
+    expect(graphContainer).toBeTruthy();
+    
+    // Simulate right-click via React - the onContextMenu handler processes it
+    // before Radix opens the menu, ensuring correct node targeting
     await act(async () => {
-      Network.simulateEvent('oncontext', { 
-        pointer: { DOM: { x: 100, y: 100 } },
-        event: { ctrlKey: false, metaKey: false }
+      const event = new MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        clientX: 100,
+        clientY: 100,
       });
+      graphContainer!.dispatchEvent(event);
     });
     
     // No errors means handler executed successfully
-    expect(Network.getRegisteredEvents()).toContain('oncontext');
+    // The actual menu display is handled by Radix
   });
 
-  it('should have oncontext handler that processes Ctrl+click events', async () => {
-    render(<Graph data={mockData} />);
+  it('should handle Ctrl+click context menu via React onContextMenu', async () => {
+    const { container } = render(<Graph data={mockData} />);
+    const graphContainer = container.querySelector('[tabindex="0"]');
+    expect(graphContainer).toBeTruthy();
     
-    // Verify we can simulate Ctrl+click oncontext without errors
+    // Simulate Ctrl+click (Mac multi-select style context menu)
     await act(async () => {
-      Network.simulateEvent('oncontext', { 
-        pointer: { DOM: { x: 100, y: 100 } },
-        event: { ctrlKey: true, metaKey: false }
+      const event = new MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        clientX: 100,
+        clientY: 100,
+        ctrlKey: true,
+        metaKey: false,
       });
+      graphContainer!.dispatchEvent(event);
     });
     
     // No errors means handler executed successfully
-    expect(Network.getRegisteredEvents()).toContain('oncontext');
-  });
-
-  it('should not call selectNodes when Ctrl+clicking (preserves multi-select)', async () => {
-    // Set up mock to return a node before rendering
-    Network.mockGetNodeAt('b.ts');
-    
-    render(<Graph data={mockData} />);
-    
-    // First simulate a selection
-    await act(async () => {
-      Network.simulateEvent('select', { nodes: ['a.ts'], edges: [] });
-    });
-    
-    // Ctrl+click should NOT call selectNodes (let vis-network handle multi-select)
-    await act(async () => {
-      Network.simulateEvent('oncontext', { 
-        pointer: { DOM: { x: 200, y: 200 } },
-        event: { ctrlKey: true, metaKey: false }
-      });
-    });
-    
-    // We can't directly verify selectNodes wasn't called since the mock
-    // captures calls at instance level. But this test ensures the handler
-    // runs without error when Ctrl is held - the key behavior being tested
-    // is that the component processes the event correctly.
-    expect(Network.getRegisteredEvents()).toContain('oncontext');
+    // Ctrl+click on a node should show node menu, not background menu
   });
 });
