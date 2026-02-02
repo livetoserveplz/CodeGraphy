@@ -96,6 +96,142 @@ export class PathResolver {
   }
 
   /**
+   * Resolves a using directive to file paths, but only for types that are actually used.
+   * This prevents false connections to files in the same namespace folder
+   * that aren't actually used.
+   * 
+   * @param using - The detected using directive
+   * @param fromFile - The file containing the using
+   * @param usedTypes - Set of type names actually used in the file
+   * @returns Array of resolved absolute paths (empty if not used/unresolved)
+   */
+  resolveWithTypes(using: IDetectedUsing, _fromFile: string, usedTypes: Set<string>): string[] {
+    const namespace = using.namespace;
+    
+    // Check if it's a System or third-party namespace (external)
+    if (this._isExternalNamespace(namespace)) {
+      return [];
+    }
+    
+    const results: string[] = [];
+    
+    // Check if we have an exact namespace match from registered files
+    if (this._namespaceToFileMap.has(namespace)) {
+      const relativePath = this._namespaceToFileMap.get(namespace)!;
+      // Check if the file name (without extension) matches a used type
+      const fileName = path.basename(relativePath, '.cs');
+      if (usedTypes.has(fileName)) {
+        results.push(path.join(this._workspaceRoot, relativePath).replace(/\\/g, '/'));
+      }
+    }
+    
+    // Try to resolve using used types
+    // For each used type, check if it exists as a file in the namespace's likely location
+    const resolvedPaths = this._resolveWithUsedTypes(namespace, usedTypes);
+    results.push(...resolvedPaths);
+    
+    // Remove duplicates
+    return [...new Set(results)];
+  }
+
+  /**
+   * Resolves intra-namespace type usage (types from the same namespace, no using needed).
+   * Looks for other files in the same namespace that define types we're using.
+   * 
+   * @param namespace - The namespace of the current file
+   * @param fromFile - The current file path (to exclude from results)
+   * @param usedTypes - Set of type names actually used in the file
+   * @returns Array of resolved absolute paths to files in the same namespace
+   */
+  resolveIntraNamespace(namespace: string, fromFile: string, usedTypes: Set<string>): string[] {
+    const results: string[] = [];
+    const normalizedFromFile = fromFile.replace(/\\/g, '/');
+    
+    // Look for files that are registered with this exact namespace
+    for (const [ns, filePath] of this._namespaceToFileMap.entries()) {
+      if (ns === namespace) {
+        const fullPath = path.join(this._workspaceRoot, filePath).replace(/\\/g, '/');
+        if (fullPath !== normalizedFromFile) {
+          const fileName = path.basename(filePath, '.cs');
+          if (usedTypes.has(fileName)) {
+            results.push(fullPath);
+          }
+        }
+      }
+    }
+    
+    // Also try convention-based resolution for types in the same namespace
+    const resolvedPaths = this._resolveWithUsedTypes(namespace, usedTypes);
+    for (const resolvedPath of resolvedPaths) {
+      const normalizedPath = resolvedPath.replace(/\\/g, '/');
+      if (normalizedPath !== normalizedFromFile && !results.includes(normalizedPath)) {
+        results.push(normalizedPath);
+      }
+    }
+    
+    // For intra-namespace specifically, also check root source directories
+    // This handles cases where the root namespace files are directly in src/
+    for (const srcDir of this._config.sourceDirs || ['']) {
+      for (const typeName of usedTypes) {
+        const filePath = srcDir ? path.join(srcDir, typeName + '.cs') : typeName + '.cs';
+        if (this._fileExists(filePath)) {
+          const fullPath = path.join(this._workspaceRoot, filePath).replace(/\\/g, '/');
+          if (fullPath !== normalizedFromFile && !results.includes(fullPath)) {
+            results.push(fullPath);
+          }
+        }
+      }
+    }
+    
+    return results;
+  }
+
+  /**
+   * Resolves namespace + used types to actual file paths.
+   * For each used type, check if a matching .cs file exists in the namespace location.
+   */
+  private _resolveWithUsedTypes(namespace: string, usedTypes: Set<string>): string[] {
+    const resolved: string[] = [];
+    const parts = namespace.split('.');
+    
+    // Try different namespace strip levels (but not stripping ALL parts - 
+    // that would match files from any namespace. Intra-namespace handles same-ns separately)
+    for (let stripCount = 0; stripCount < parts.length; stripCount++) {
+      const namespaceParts = parts.slice(stripCount);
+      const nsPath = namespaceParts.join('/');
+      
+      for (const srcDir of this._config.sourceDirs || ['']) {
+        for (const typeName of usedTypes) {
+          // Check if TypeName.cs exists in the namespace path
+          // When nsPath is empty (all parts stripped), look directly in srcDir
+          const filePath = nsPath
+            ? (srcDir ? path.join(srcDir, nsPath, typeName + '.cs') : path.join(nsPath, typeName + '.cs'))
+            : (srcDir ? path.join(srcDir, typeName + '.cs') : typeName + '.cs');
+          
+          if (this._fileExists(filePath)) {
+            resolved.push(path.join(this._workspaceRoot, filePath).replace(/\\/g, '/'));
+          }
+          
+          // Also try without the last namespace part (it might be the type name)
+          if (namespaceParts.length > 0 && namespaceParts[namespaceParts.length - 1] === typeName) {
+            const parentPath = namespaceParts.slice(0, -1).join('/');
+            const parentFilePath = parentPath
+              ? (srcDir ? path.join(srcDir, parentPath, typeName + '.cs') : path.join(parentPath, typeName + '.cs'))
+              : (srcDir ? path.join(srcDir, typeName + '.cs') : typeName + '.cs');
+            
+            if (this._fileExists(parentFilePath)) {
+              resolved.push(path.join(this._workspaceRoot, parentFilePath).replace(/\\/g, '/'));
+            }
+          }
+        }
+      }
+    }
+    
+    // Remove duplicates
+    return [...new Set(resolved)];
+  }
+
+  /**
    * Attempts convention-based resolution.
    * Tries multiple strategies to map namespace to file path:
    * 1. With configured root namespace stripped

@@ -18,6 +18,8 @@ export interface IDetectedUsing {
   isGlobal: boolean;
   /** Line number where the using appears (1-indexed) */
   line: number;
+  /** Types from this namespace that are actually used in the file */
+  usedTypes?: string[];
 }
 
 /**

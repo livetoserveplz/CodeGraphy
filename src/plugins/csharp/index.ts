@@ -108,23 +108,44 @@ export function createCSharpPlugin(): IPlugin {
         namespaceRegistry.get(filePath)!.push(ns);
       }
       
+      // Extract type names actually used in the file body
+      // Look for: new TypeName(), TypeName.Method(), : TypeName, etc.
+      const usedTypes = extractUsedTypes(content);
+      
       const connections: IConnection[] = [];
 
       for (const using of usings) {
-        const resolvedPath = resolver.resolve(using, filePath);
+        // For each using, find all files that match used types from this namespace
+        const resolvedPaths = resolver.resolveWithTypes(using, filePath, usedTypes);
         
-        // Build specifier string
-        let specifier = using.namespace;
-        if (using.isGlobal) specifier = `global using ${specifier}`;
-        else if (using.isStatic) specifier = `using static ${specifier}`;
-        else if (using.alias) specifier = `using ${using.alias} = ${specifier}`;
-        else specifier = `using ${specifier}`;
-        
-        connections.push({
-          specifier,
-          resolvedPath,
-          type: 'static',
-        });
+        for (const resolvedPath of resolvedPaths) {
+          // Build specifier string
+          let specifier = using.namespace;
+          if (using.isGlobal) specifier = `global using ${specifier}`;
+          else if (using.isStatic) specifier = `using static ${specifier}`;
+          else if (using.alias) specifier = `using ${using.alias} = ${specifier}`;
+          else specifier = `using ${specifier}`;
+          
+          connections.push({
+            specifier,
+            resolvedPath,
+            type: 'static',
+          });
+        }
+      }
+      
+      // Also check for intra-namespace type usage (same namespace, no using needed)
+      // For each namespace this file declares, look for other files in that namespace
+      // that define types we're using
+      for (const ns of namespaces) {
+        const intraNsConnections = resolver.resolveIntraNamespace(ns.name, filePath, usedTypes);
+        for (const resolvedPath of intraNsConnections) {
+          connections.push({
+            specifier: `[same namespace: ${ns.name}]`,
+            resolvedPath,
+            type: 'static',
+          });
+        }
       }
 
       return connections;
@@ -136,6 +157,69 @@ export function createCSharpPlugin(): IPlugin {
       namespaceRegistry.clear();
     },
   };
+}
+
+/**
+ * Extracts type names that are actually used in C# code.
+ * Looks for patterns like:
+ * - new TypeName(...)
+ * - TypeName.Method(...)
+ * - TypeName.Property
+ * - : TypeName (inheritance/implementation)
+ * - TypeName variable
+ * - <TypeName> (generics)
+ */
+function extractUsedTypes(content: string): Set<string> {
+  const types = new Set<string>();
+  
+  // Remove comments and strings to avoid false positives
+  const cleanContent = content
+    .replace(/\/\*[\s\S]*?\*\//g, '')  // Multi-line comments
+    .replace(/\/\/.*/g, '')             // Single-line comments
+    .replace(/"(?:[^"\\]|\\.)*"/g, '')  // Double-quoted strings
+    .replace(/@"(?:[^"]|"")*"/g, '')    // Verbatim strings
+    .replace(/'(?:[^'\\]|\\.)*'/g, ''); // Char literals
+  
+  // Pattern: new TypeName(
+  const newPattern = /\bnew\s+([A-Z][A-Za-z0-9_]*)\s*[(<]/g;
+  let match;
+  while ((match = newPattern.exec(cleanContent)) !== null) {
+    types.add(match[1]);
+  }
+  
+  // Pattern: TypeName.Something (static access)
+  const staticPattern = /\b([A-Z][A-Za-z0-9_]*)\s*\.\s*[A-Za-z_]/g;
+  while ((match = staticPattern.exec(cleanContent)) !== null) {
+    // Exclude common non-type words
+    const typeName = match[1];
+    if (!['String', 'Console', 'Math', 'Convert', 'Guid', 'DateTime', 'TimeSpan', 'Task', 'File', 'Path', 'Directory', 'Environment'].includes(typeName)) {
+      types.add(typeName);
+    }
+  }
+  
+  // Pattern: : TypeName (inheritance) or : ITypeName (interface)
+  const inheritPattern = /:\s*([A-Z][A-Za-z0-9_]*)/g;
+  while ((match = inheritPattern.exec(cleanContent)) !== null) {
+    types.add(match[1]);
+  }
+  
+  // Pattern: <TypeName> (generics)
+  const genericPattern = /<\s*([A-Z][A-Za-z0-9_]*)\s*>/g;
+  while ((match = genericPattern.exec(cleanContent)) !== null) {
+    types.add(match[1]);
+  }
+  
+  // Pattern: TypeName variableName (declarations)
+  const declPattern = /\b([A-Z][A-Za-z0-9_]*)\s+[a-z_][A-Za-z0-9_]*\s*[=;,)]/g;
+  while ((match = declPattern.exec(cleanContent)) !== null) {
+    const typeName = match[1];
+    // Exclude C# keywords that look like types
+    if (!['String', 'Object', 'Boolean', 'Int32', 'Int64', 'Double', 'Decimal', 'Byte', 'Char', 'Void'].includes(typeName)) {
+      types.add(typeName);
+    }
+  }
+  
+  return types;
 }
 
 /**
