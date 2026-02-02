@@ -14,6 +14,11 @@ CodeGraphy provides several settings to customize its behavior. Configure these 
 | `codegraphy.favorites` | string[] | `[]` | Favorite file paths (highlighted with yellow border) |
 | `codegraphy.plugins` | string[] | `[]` | Paths to external plugins |
 | `codegraphy.fileColors` | object | `{}` | Custom colors for file extensions |
+| `codegraphy.physics.gravitationalConstant` | number | `-50` | Gravity strength (more negative = stronger pull) |
+| `codegraphy.physics.springLength` | number | `100` | Preferred distance between connected nodes |
+| `codegraphy.physics.springConstant` | number | `0.08` | Spring stiffness (connection strength) |
+| `codegraphy.physics.damping` | number | `0.4` | Motion settling speed (higher = faster) |
+| `codegraphy.physics.centralGravity` | number | `0.01` | Pull toward viewport center |
 
 ## Detailed Documentation
 
@@ -216,6 +221,25 @@ CodeGraphy uses a dynamic color system with three priority levels:
   }
 }
 ```
+
+### Physics Settings
+
+Tune the force simulation using the gear icon in the graph view or by setting values directly in `settings.json`:
+
+```json
+{
+  "codegraphy.physics.gravitationalConstant": -80,
+  "codegraphy.physics.springLength": 140,
+  "codegraphy.physics.springConstant": 0.1,
+  "codegraphy.physics.damping": 0.35,
+  "codegraphy.physics.centralGravity": 0.02
+}
+```
+
+**Notes:**
+- `gravitationalConstant` should be negative (more negative = stronger pull).
+- `springLength` controls desired edge length; larger values spread nodes out.
+- `damping` and `centralGravity` range from 0–1.
 
 ## Example Configurations
 

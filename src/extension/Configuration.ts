@@ -42,6 +42,8 @@ export interface ICodeGraphyConfig {
   plugins: string[];
   /** User-defined colors for file extensions (overrides plugin/generated colors) */
   fileColors: Record<string, string>;
+  /** What determines node size in the graph */
+  nodeSizeBy: NodeSizeMode;
 }
 
 /**
@@ -165,6 +167,7 @@ export class Configuration {
       showOrphans: this.showOrphans,
       plugins: this.plugins,
       fileColors: this.fileColors,
+      nodeSizeBy: this.nodeSizeBy,
     };
   }
 
