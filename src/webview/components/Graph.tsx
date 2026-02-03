@@ -754,7 +754,7 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark', bid
                 'access-count'
               );
               
-              // Update all nodes with new sizes
+              // Update all nodes with new sizes (exclude x,y to preserve positions)
               currentData.nodes.forEach((node) => {
                 const visNode = toVisNode(
                   node, 
@@ -762,7 +762,9 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark', bid
                   nodeSizes.get(node.id), 
                   themeRef.current
                 );
-                nodesRef.current?.update(visNode);
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                const { x, y, ...styleProps } = visNode;
+                nodesRef.current?.update(styleProps);
               });
             }
           }
@@ -1058,7 +1060,10 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark', bid
     
     data.nodes.forEach((node) => {
       const visNode = toVisNode(node, favorites.has(node.id), nodeSizes.get(node.id), theme);
-      nodesRef.current?.update(visNode);
+      // Exclude x,y to preserve current positions (styling update only)
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { x, y, ...styleProps } = visNode;
+      nodesRef.current?.update(styleProps);
     });
   }, [favorites, data.nodes, data.edges, data.nodeSizeMode, theme]);
 
@@ -1150,8 +1155,11 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark', bid
       
       data.nodes.forEach((node) => {
         const visNode = toVisNode(node, favorites.has(node.id), nodeSizes.get(node.id), themeRef.current);
+        // Exclude x,y to preserve current positions (not reset to persisted positions)
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { x, y, ...styleProps } = visNode;
         nodesDataSet.update({
-          ...visNode,
+          ...styleProps,
           opacity: 1.0,
           font: { color: textColor, size: 12 },
         });
