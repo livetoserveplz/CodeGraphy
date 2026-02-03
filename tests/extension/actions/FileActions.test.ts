@@ -18,6 +18,10 @@ vi.mock('vscode', () => ({
       rename: vi.fn(),
     },
     openTextDocument: vi.fn(),
+    getConfiguration: vi.fn(() => ({
+      get: vi.fn(() => []),
+      update: vi.fn().mockResolvedValue(undefined),
+    })),
   },
   window: {
     showTextDocument: vi.fn(),
@@ -32,6 +36,11 @@ vi.mock('vscode', () => ({
       fsPath: `${base.fsPath}/${pathSegments.join('/')}`,
       toString: () => `file://${base.fsPath}/${pathSegments.join('/')}`,
     })),
+  },
+  ConfigurationTarget: {
+    Global: 1,
+    Workspace: 2,
+    WorkspaceFolder: 3,
   },
 }));
 
@@ -118,11 +127,26 @@ describe('DeleteFilesAction', () => {
 describe('RenameFileAction', () => {
   const mockWorkspaceFolder = { fsPath: '/workspace' } as vscode.Uri;
   let mockRefreshGraph: ReturnType<typeof vi.fn>;
+  let mockGetConfiguration: ReturnType<typeof vi.fn>;
+  let mockConfigUpdate: ReturnType<typeof vi.fn>;
+  let currentFavorites: string[];
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockRefreshGraph = vi.fn().mockResolvedValue(undefined);
     (vscode.workspace.fs.rename as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+    
+    // Setup configuration mock for favorites
+    currentFavorites = [];
+    mockConfigUpdate = vi.fn().mockResolvedValue(undefined);
+    mockGetConfiguration = vi.fn().mockReturnValue({
+      get: vi.fn((key: string, defaultValue: string[] = []) => {
+        if (key === 'favorites') return currentFavorites;
+        return defaultValue;
+      }),
+      update: mockConfigUpdate,
+    });
+    (vscode.workspace as unknown as { getConfiguration: typeof mockGetConfiguration }).getConfiguration = mockGetConfiguration;
   });
 
   afterEach(() => {
@@ -167,6 +191,70 @@ describe('RenameFileAction', () => {
     // rename should be called twice - once for execute, once for undo (reversed)
     expect(vscode.workspace.fs.rename).toHaveBeenCalledTimes(2);
     expect(mockRefreshGraph).toHaveBeenCalledTimes(2);
+  });
+
+  it('should update favorites when renaming a favorited file', async () => {
+    // File is in favorites before rename
+    currentFavorites = ['src/old.ts', 'other/file.ts'];
+
+    const action = new RenameFileAction(
+      'src/old.ts',
+      'src/new.ts',
+      mockWorkspaceFolder,
+      mockRefreshGraph
+    );
+
+    await action.execute();
+
+    // Should update favorites with the new path
+    expect(mockConfigUpdate).toHaveBeenCalledWith(
+      'favorites',
+      ['src/new.ts', 'other/file.ts'],
+      expect.anything()
+    );
+  });
+
+  it('should restore favorites when undoing rename of favorited file', async () => {
+    // File is in favorites before rename
+    currentFavorites = ['src/old.ts', 'other/file.ts'];
+
+    const action = new RenameFileAction(
+      'src/old.ts',
+      'src/new.ts',
+      mockWorkspaceFolder,
+      mockRefreshGraph
+    );
+
+    await action.execute();
+    
+    // Simulate that favorites now contain the new path
+    currentFavorites = ['src/new.ts', 'other/file.ts'];
+    
+    await action.undo();
+
+    // Should restore favorites with the old path
+    expect(mockConfigUpdate).toHaveBeenLastCalledWith(
+      'favorites',
+      ['src/old.ts', 'other/file.ts'],
+      expect.anything()
+    );
+  });
+
+  it('should not modify favorites when renaming non-favorited file', async () => {
+    // File is NOT in favorites
+    currentFavorites = ['other/file.ts'];
+
+    const action = new RenameFileAction(
+      'src/old.ts',
+      'src/new.ts',
+      mockWorkspaceFolder,
+      mockRefreshGraph
+    );
+
+    await action.execute();
+
+    // Should not update favorites
+    expect(mockConfigUpdate).not.toHaveBeenCalled();
   });
 });
 

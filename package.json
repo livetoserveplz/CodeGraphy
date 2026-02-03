@@ -80,18 +80,18 @@
         "command": "codegraphy.undo",
         "key": "ctrl+z",
         "mac": "cmd+z",
-        "when": "focusedView == 'codegraphy.graphView'"
+        "when": "codegraphy.viewVisible && activeViewlet == 'workbench.view.extension.codegraphy' && !editorTextFocus && !inputFocus"
       },
       {
         "command": "codegraphy.redo",
         "key": "ctrl+shift+z",
         "mac": "cmd+shift+z",
-        "when": "focusedView == 'codegraphy.graphView'"
+        "when": "codegraphy.viewVisible && activeViewlet == 'workbench.view.extension.codegraphy' && !editorTextFocus && !inputFocus"
       },
       {
         "command": "codegraphy.redo",
         "key": "ctrl+y",
-        "when": "focusedView == 'codegraphy.graphView'"
+        "when": "codegraphy.viewVisible && activeViewlet == 'workbench.view.extension.codegraphy' && !editorTextFocus && !inputFocus"
       }
     ],
     "viewsContainers": {

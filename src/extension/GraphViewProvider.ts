@@ -114,9 +114,15 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
+    // Set context for keybindings - initial state
+    vscode.commands.executeCommand('setContext', 'codegraphy.viewVisible', webviewView.visible);
+
     // Listen for visibility changes (e.g., switching between views)
     // When view becomes visible again, re-send the graph data
     webviewView.onDidChangeVisibility(() => {
+      // Update keybinding context
+      vscode.commands.executeCommand('setContext', 'codegraphy.viewVisible', webviewView.visible);
+      
       if (webviewView.visible) {
         console.log('[CodeGraphy] View became visible, re-sending data');
         this._analyzeAndSendData();
