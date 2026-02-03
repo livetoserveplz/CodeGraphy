@@ -12,8 +12,6 @@ export default defineConfig({
     teardownTimeout: 5000,
     testTimeout: 30000,
     hookTimeout: 10000,
-    // Run tests sequentially to reduce memory pressure
-    fileParallelism: false,
     coverage: {
       reporter: ['text', 'html'],
       include: ['src/**/*.{ts,tsx}'],
