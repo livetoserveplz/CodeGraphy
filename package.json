@@ -187,7 +187,10 @@
         },
         "codegraphy.bidirectionalEdges": {
           "type": "string",
-          "enum": ["separate", "combined"],
+          "enum": [
+            "separate",
+            "combined"
+          ],
           "default": "separate",
           "enumDescriptions": [
             "Show two separate arrows for bidirectional connections",
@@ -261,12 +264,16 @@
     "dev": "npm run watch",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:visual": "playwright test",
+    "test:visual:update": "playwright test --update-snapshots",
+    "visual:serve": "vite --config vite.visual.config.ts",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
     "prepare": "husky"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
+    "@playwright/test": "^1.58.1",
     "@testing-library/jest-dom": "^6.2.0",
     "@testing-library/react": "^14.1.2",
     "@types/node": "^20.11.0",
