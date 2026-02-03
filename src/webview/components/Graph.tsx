@@ -16,7 +16,15 @@ import {
   WebviewToExtensionMessage,
   ExtensionToWebviewMessage,
   NodeSizeMode,
+  NodeGroupingMode,
+  IFolderGroup,
 } from '../../shared/types';
+import {
+  calculateFolderGroups,
+  getClusterId,
+  isClusterId,
+  getFolderFromClusterId,
+} from '../lib/grouping';
 import {
   ContextMenu,
   ContextMenuTrigger,
@@ -47,6 +55,9 @@ interface GraphProps {
   onFavoritesChange?: (favorites: Set<string>) => void;
   theme?: ThemeKind;
   bidirectionalMode?: BidirectionalEdgeMode;
+  groupingMode?: NodeGroupingMode;
+  collapsedGroups?: Set<string>;
+  onGroupCollapseChange?: (groupId: string) => void;
 }
 
 /**
@@ -341,6 +352,80 @@ function toVisEdge(edge: ProcessedEdge) {
 }
 
 /**
+ * Apply folder grouping clusters to the network.
+ * Creates cluster nodes for each folder group and handles collapse state.
+ */
+function applyFolderClustering(
+  network: Network,
+  groups: IFolderGroup[],
+  theme: ThemeKind = 'dark'
+): void {
+  const isLight = theme === 'light';
+  
+  for (const group of groups) {
+    if (group.collapsed && group.nodeIds.length > 0) {
+      const clusterId = getClusterId(group.id);
+      
+      // Check if cluster already exists
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const existingNodes = (network as any).body?.nodes;
+        if (existingNodes && existingNodes[clusterId]) {
+          continue; // Cluster already exists
+        }
+      } catch {
+        // Ignore errors checking existing clusters
+      }
+      
+      const clusterOptions = {
+        joinCondition: (nodeOptions: { id: string }) => {
+          return group.nodeIds.includes(nodeOptions.id);
+        },
+        clusterNodeProperties: {
+          id: clusterId,
+          label: `📁 ${group.label} (${group.nodeIds.length})`,
+          shape: 'box',
+          color: {
+            background: isLight ? adjustColorForLightTheme(group.color) + '40' : group.color + '40',
+            border: isLight ? adjustColorForLightTheme(group.color) : group.color,
+            highlight: {
+              background: isLight ? adjustColorForLightTheme(group.color) + '60' : group.color + '60',
+              border: isLight ? '#000000' : '#ffffff',
+            },
+            hover: {
+              background: isLight ? adjustColorForLightTheme(group.color) + '50' : group.color + '50',
+              border: isLight ? '#64748b' : '#94a3b8',
+            },
+          },
+          font: {
+            color: isLight ? '#1e1e1e' : '#e2e8f0',
+            size: 14,
+            face: 'system-ui, -apple-system, sans-serif',
+          },
+          borderWidth: 2,
+          margin: { top: 10, right: 10, bottom: 10, left: 10 },
+        },
+      };
+      
+      network.cluster(clusterOptions);
+    }
+  }
+}
+
+/**
+ * Open a cluster to show its contained nodes.
+ */
+function openCluster(network: Network, clusterId: string): void {
+  try {
+    if (network.isCluster(clusterId)) {
+      network.openCluster(clusterId);
+    }
+  } catch (error) {
+    console.error('[CodeGraphy] Failed to open cluster:', error);
+  }
+}
+
+/**
  * Send message to extension
  */
 function postMessage(message: WebviewToExtensionMessage): void {
@@ -411,7 +496,15 @@ function sendAllPositions(network: Network, nodeIds: string[]): void {
 /**
  * Graph component with context menu and multi-select support.
  */
-export default function Graph({ data, favorites = new Set(), theme = 'dark', bidirectionalMode = 'separate' }: GraphProps): React.ReactElement {
+export default function Graph({ 
+  data, 
+  favorites = new Set(), 
+  theme = 'dark', 
+  bidirectionalMode = 'separate',
+  groupingMode = 'none',
+  collapsedGroups = new Set(),
+  onGroupCollapseChange,
+}: GraphProps): React.ReactElement {
   const containerRef = useRef<HTMLDivElement>(null);
   const networkRef = useRef<Network | null>(null);
   const nodesRef = useRef<DataSet<ReturnType<typeof toVisNode>> | null>(null);
@@ -420,6 +513,14 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark', bid
   const dataRef = useRef(data);
   const favoritesRef = useRef(favorites);
   const bidirectionalModeRef = useRef(bidirectionalMode);
+  const groupingModeRef = useRef(groupingMode);
+  const collapsedGroupsRef = useRef(collapsedGroups);
+  
+  // Track folder groups
+  const [folderGroups, setFolderGroups] = useState<IFolderGroup[]>([]);
+  
+  // Ref for onGroupCollapseChange callback (used in event handlers)
+  const onGroupCollapseChangeRef = useRef(onGroupCollapseChange);
   
   // Selection state
   const [selectedNodes, setSelectedNodes] = useState<string[]>([]);
@@ -446,6 +547,9 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark', bid
   dataRef.current = data;
   favoritesRef.current = favorites;
   bidirectionalModeRef.current = bidirectionalMode;
+  groupingModeRef.current = groupingMode;
+  collapsedGroupsRef.current = collapsedGroups;
+  onGroupCollapseChangeRef.current = onGroupCollapseChange;
   selectedNodesRef.current = selectedNodes;
   themeRef.current = theme;
 
@@ -706,9 +810,16 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark', bid
     networkRef.current = network;
     initializedRef.current = true;
 
-    // Save positions after physics stabilization
+    // Save positions after physics stabilization and apply clustering
     network.on('stabilized', () => {
       sendAllPositions(network, nodes.getIds() as string[]);
+      
+      // Apply folder clustering if grouping is enabled
+      if (groupingModeRef.current === 'folder') {
+        const groups = calculateFolderGroups(initialData.nodes, collapsedGroupsRef.current);
+        setFolderGroups(groups);
+        applyFolderClustering(network, groups, themeRef.current);
+      }
     });
 
     // Handle selection changes
@@ -726,6 +837,20 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark', bid
     network.on('doubleClick', (params) => {
       if (params.nodes.length > 0) {
         const nodeId = params.nodes[0] as string;
+        
+        // Check if it's a cluster node
+        if (isClusterId(nodeId)) {
+          // Toggle cluster: open it and notify extension
+          const folderId = getFolderFromClusterId(nodeId);
+          openCluster(network, nodeId);
+          if (onGroupCollapseChangeRef.current) {
+            onGroupCollapseChangeRef.current(folderId);
+          }
+          postMessage({ type: 'TOGGLE_GROUP_COLLAPSE', payload: { groupId: folderId } });
+          return;
+        }
+        
+        // Regular node double-click
         // Clear cache so visit count is refreshed on next hover
         fileInfoCacheRef.current.delete(nodeId);
         postMessage({ type: 'NODE_DOUBLE_CLICKED', payload: { nodeId } });
@@ -986,6 +1111,50 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark', bid
     }
     edgesRef.current.add(processedEdges.map(toVisEdge));
   }, [bidirectionalMode, data.edges]);
+
+  /**
+   * Apply/update folder grouping when mode or collapsed state changes
+   */
+  useEffect(() => {
+    const network = networkRef.current;
+    if (!network || !initializedRef.current) return;
+
+    if (groupingMode === 'folder') {
+      // Calculate folder groups from current data
+      const groups = calculateFolderGroups(data.nodes, collapsedGroups);
+      setFolderGroups(groups);
+      
+      // First, open any clusters that should no longer be collapsed
+      for (const group of groups) {
+        if (!group.collapsed) {
+          const clusterId = getClusterId(group.id);
+          try {
+            if (network.isCluster(clusterId)) {
+              openCluster(network, clusterId);
+            }
+          } catch {
+            // Cluster doesn't exist, that's fine
+          }
+        }
+      }
+      
+      // Then apply clustering for collapsed groups
+      applyFolderClustering(network, groups, theme);
+    } else {
+      // Grouping disabled - open all clusters
+      setFolderGroups([]);
+      for (const group of folderGroups) {
+        const clusterId = getClusterId(group.id);
+        try {
+          if (network.isCluster(clusterId)) {
+            openCluster(network, clusterId);
+          }
+        } catch {
+          // Cluster doesn't exist
+        }
+      }
+    }
+  }, [groupingMode, collapsedGroups, data.nodes, theme, folderGroups]);
 
   /**
    * Handle context menu trigger - captures node BEFORE Radix opens menu

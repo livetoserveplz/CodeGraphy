@@ -4,7 +4,7 @@ import Graph from './components/Graph';
 import GraphIcon from './components/GraphIcon';
 import { SearchBar } from './components/SearchBar';
 import { useTheme } from './hooks/useTheme';
-import { IGraphData, BidirectionalEdgeMode, ExtensionToWebviewMessage, WebviewToExtensionMessage } from '../shared/types';
+import { IGraphData, BidirectionalEdgeMode, NodeGroupingMode, ExtensionToWebviewMessage, WebviewToExtensionMessage } from '../shared/types';
 
 // Get VSCode API if available (must be called exactly once at module level)
 declare function acquireVsCodeApi(): {
@@ -36,6 +36,8 @@ export default function App(): React.ReactElement {
   const [isLoading, setIsLoading] = useState(true);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [bidirectionalMode, setBidirectionalMode] = useState<BidirectionalEdgeMode>('separate');
+  const [groupingMode, setGroupingMode] = useState<NodeGroupingMode>('none');
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const theme = useTheme();
 
@@ -80,6 +82,7 @@ export default function App(): React.ReactElement {
           break;
         case 'SETTINGS_UPDATED':
           setBidirectionalMode(message.payload.bidirectionalEdges);
+          setGroupingMode(message.payload.groupingMode);
           break;
       }
     };
@@ -96,6 +99,19 @@ export default function App(): React.ReactElement {
       window.removeEventListener('message', handleMessage);
     };
   }, []); // Run once on mount
+
+  // Handler for group collapse toggle
+  const handleGroupCollapseChange = (groupId: string) => {
+    setCollapsedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(groupId)) {
+        next.delete(groupId);
+      } else {
+        next.add(groupId);
+      }
+      return next;
+    });
+  };
 
   // Loading state
   if (isLoading) {
@@ -146,6 +162,9 @@ export default function App(): React.ReactElement {
           favorites={favorites} 
           theme={theme}
           bidirectionalMode={bidirectionalMode}
+          groupingMode={groupingMode}
+          collapsedGroups={collapsedGroups}
+          onGroupCollapseChange={handleGroupCollapseChange}
         />
       </div>
     </div>

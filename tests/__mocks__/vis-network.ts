@@ -76,6 +76,11 @@ export class Network {
 
   getSelectedNodes = vi.fn(() => [...this.selectedNodes]);
 
+  // Clustering methods
+  isCluster = vi.fn(() => false);
+  cluster = vi.fn();
+  openCluster = vi.fn();
+
   // Returns the mocked node at position (set via setMockNodeAtPosition or mockGetNodeAt)
   getNodeAt = vi.fn((position: { x: number; y: number }) => {
     // First check position-based mapping

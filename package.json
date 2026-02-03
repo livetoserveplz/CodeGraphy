@@ -178,6 +178,19 @@
           ],
           "default": "connections",
           "description": "What determines the size of nodes in the graph."
+        },
+        "codegraphy.groupBy": {
+          "type": "string",
+          "enum": [
+            "none",
+            "folder"
+          ],
+          "enumDescriptions": [
+            "No grouping - show all nodes individually",
+            "Group nodes by their parent folder"
+          ],
+          "default": "none",
+          "description": "How to group nodes in the graph. Grouped nodes can be collapsed."
         }
       }
     }

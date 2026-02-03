@@ -15,6 +15,29 @@
  */
 export type NodeSizeMode = 'connections' | 'file-size' | 'access-count' | 'uniform';
 
+/**
+ * Node grouping mode.
+ * Determines how nodes are grouped in the graph.
+ */
+export type NodeGroupingMode = 'none' | 'folder';
+
+/**
+ * Represents a folder group in the graph.
+ * Groups nodes that share the same parent folder.
+ */
+export interface IFolderGroup {
+  /** Unique identifier for the group (folder path) */
+  id: string;
+  /** Display label for the group */
+  label: string;
+  /** Node IDs contained in this group */
+  nodeIds: string[];
+  /** Whether the group is collapsed */
+  collapsed: boolean;
+  /** Color for the group boundary */
+  color: string;
+}
+
 // ============================================================================
 // File Data (internal representation, what plugins will produce)
 // ============================================================================
@@ -192,6 +215,8 @@ export interface IGraphData {
   edges: IGraphEdge[];
   /** Node sizing mode setting */
   nodeSizeMode?: NodeSizeMode;
+  /** Node grouping mode setting */
+  groupingMode?: NodeGroupingMode;
 }
 
 // ============================================================================
@@ -223,7 +248,7 @@ export type ExtensionToWebviewMessage =
   | { type: 'FAVORITES_UPDATED'; payload: { favorites: string[] } }
   | { type: 'THEME_CHANGED'; payload: { kind: 'light' | 'dark' | 'high-contrast' } }
   | { type: 'FILE_INFO'; payload: IFileInfo }
-  | { type: 'SETTINGS_UPDATED'; payload: { bidirectionalEdges: BidirectionalEdgeMode } }
+  | { type: 'SETTINGS_UPDATED'; payload: { bidirectionalEdges: BidirectionalEdgeMode; groupingMode: NodeGroupingMode } }
   | { type: 'REQUEST_EXPORT_PNG' }
   | { type: 'NODE_ACCESS_COUNT_UPDATED'; payload: { nodeId: string; accessCount: number } };
 
@@ -263,7 +288,10 @@ export type WebviewToExtensionMessage =
   | { type: 'ADD_TO_EXCLUDE'; payload: { patterns: string[] } }
   | { type: 'REFRESH_GRAPH' }
   | { type: 'GET_FILE_INFO'; payload: { path: string } }
-  | { type: 'EXPORT_PNG'; payload: { dataUrl: string; filename?: string } };
+  | { type: 'EXPORT_PNG'; payload: { dataUrl: string; filename?: string } }
+  // Grouping actions
+  | { type: 'TOGGLE_GROUP_COLLAPSE'; payload: { groupId: string } }
+  | { type: 'GROUP_COLLAPSE_STATE_UPDATED'; payload: { collapsedGroups: string[] } };
 
 /**
  * File information returned from extension for tooltips.

@@ -9,6 +9,7 @@ import * as vscode from 'vscode';
 import {
   IGraphData,
   BidirectionalEdgeMode,
+  NodeGroupingMode,
   ExtensionToWebviewMessage,
   WebviewToExtensionMessage,
 } from '../shared/types';
@@ -619,7 +620,8 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
   private _sendSettings(): void {
     const config = vscode.workspace.getConfiguration('codegraphy');
     const bidirectionalEdges = config.get<BidirectionalEdgeMode>('bidirectionalEdges', 'separate');
-    this._sendMessage({ type: 'SETTINGS_UPDATED', payload: { bidirectionalEdges } });
+    const groupingMode = config.get<NodeGroupingMode>('groupBy', 'none');
+    this._sendMessage({ type: 'SETTINGS_UPDATED', payload: { bidirectionalEdges, groupingMode } });
   }
 
   /**
