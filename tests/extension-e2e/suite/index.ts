@@ -5,7 +5,7 @@
 
 import * as path from 'path';
 import Mocha from 'mocha';
-import { glob } from 'glob';
+import * as fs from 'fs';
 
 export async function run(): Promise<void> {
   // Create the mocha test
@@ -17,8 +17,8 @@ export async function run(): Promise<void> {
 
   const testsRoot = path.resolve(__dirname, '.');
 
-  // Find all test files
-  const files = await glob('**/*.test.js', { cwd: testsRoot });
+  // Find all test files (simple fs-based approach avoids glob issues)
+  const files = fs.readdirSync(testsRoot).filter(f => f.endsWith('.test.js'));
 
   // Add files to the test suite
   files.forEach((f) => mocha.addFile(path.resolve(testsRoot, f)));

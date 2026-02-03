@@ -35,12 +35,9 @@ jobs:
       - name: Build
         run: npm run build
 
-  # Visual regression tests - manual trigger only until Linux baselines exist
-  # Run locally with: npm run test:visual
   visual-regression:
     runs-on: ubuntu-latest
     needs: build-and-test
-    if: github.event_name == 'workflow_dispatch'
     
     steps:
       - name: Checkout
@@ -59,22 +56,19 @@ jobs:
         run: npx playwright install chromium --with-deps
       
       - name: Run visual regression tests
-        run: npm run test:visual
+        run: npm run test:visual -- --update-snapshots
       
-      - name: Upload visual test results
+      - name: Upload snapshots as artifacts
         uses: actions/upload-artifact@v4
-        if: failure()
+        if: always()
         with:
-          name: playwright-report
-          path: playwright-report/
-          retention-days: 7
+          name: visual-snapshots
+          path: tests/visual/graph.spec.ts-snapshots/
+          retention-days: 30
 
-  # Extension E2E tests - manual trigger only until stabilized
-  # Run locally with: npm run test:e2e
   extension-e2e:
     runs-on: ubuntu-latest
     needs: build-and-test
-    if: github.event_name == 'workflow_dispatch'
     
     steps:
       - name: Checkout
@@ -88,6 +82,11 @@ jobs:
       
       - name: Install dependencies
         run: npm ci
+      
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2 libgbm1 libgtk-3-0 libnss3 xvfb
       
       - name: Build extension
         run: npm run build

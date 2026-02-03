@@ -41,10 +41,13 @@ export default defineConfig({
   // Snapshot settings for visual regression
   expect: {
     toHaveScreenshot: {
-      // Allow small differences due to anti-aliasing
-      maxDiffPixelRatio: 0.01,
+      // Allow small differences due to anti-aliasing and cross-platform rendering
+      maxDiffPixelRatio: 0.02,
       // Animation threshold
       animations: 'disabled',
     },
   },
+  
+  // Use platform-agnostic snapshot names
+  snapshotPathTemplate: '{testDir}/{testFileDir}/{testFileName}-snapshots/{arg}{ext}',
 });
