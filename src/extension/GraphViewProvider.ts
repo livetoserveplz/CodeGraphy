@@ -411,6 +411,26 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
         case 'EXPORT_PNG':
           await this._saveExportedPng(message.payload.dataUrl, message.payload.filename);
           break;
+          
+        case 'UNDO': {
+          const undoDesc = await this.undo();
+          if (undoDesc) {
+            vscode.window.showInformationMessage(`Undo: ${undoDesc}`);
+          } else {
+            vscode.window.showInformationMessage('Nothing to undo');
+          }
+          break;
+        }
+        
+        case 'REDO': {
+          const redoDesc = await this.redo();
+          if (redoDesc) {
+            vscode.window.showInformationMessage(`Redo: ${redoDesc}`);
+          } else {
+            vscode.window.showInformationMessage('Nothing to redo');
+          }
+          break;
+        }
       }
     });
   }
