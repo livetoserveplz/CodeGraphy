@@ -12,7 +12,6 @@ export default defineConfig({
     testTimeout: 30000,
     hookTimeout: 10000,
     teardownTimeout: 5000,
-    pool: 'forks',
     coverage: {
       reporter: ['text', 'html'],
       include: ['src/**/*.{ts,tsx}'],
