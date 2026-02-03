@@ -13,7 +13,13 @@ import {
 } from '../shared/types';
 import { WorkspaceAnalyzer } from './WorkspaceAnalyzer';
 import { getUndoManager } from './UndoManager';
-import { ToggleFavoriteAction, AddToExcludeAction } from './actions';
+import {
+  ToggleFavoriteAction,
+  AddToExcludeAction,
+  DeleteFilesAction,
+  RenameFileAction,
+  CreateFileAction,
+} from './actions';
 
 /** Storage key for persisted node positions in workspace state */
 const POSITIONS_KEY = 'codegraphy.nodePositions';
@@ -482,7 +488,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
-   * Deletes files with confirmation.
+   * Deletes files with confirmation (with undo support).
    */
   private async _deleteFiles(paths: string[]): Promise<void> {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
@@ -500,29 +506,24 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
     );
 
     if (confirm === 'Delete') {
-      for (const filePath of paths) {
-        const fileUri = vscode.Uri.joinPath(workspaceFolder.uri, filePath);
-        try {
-          await vscode.workspace.fs.delete(fileUri, { useTrash: true });
-        } catch (error) {
-          vscode.window.showErrorMessage(`Failed to delete ${filePath}: ${error}`);
-        }
-      }
-      // Refresh graph after deletion
-      await this._analyzeAndSendData();
+      const action = new DeleteFilesAction(
+        paths,
+        workspaceFolder.uri,
+        () => this._analyzeAndSendData()
+      );
+      await getUndoManager().execute(action);
     }
   }
 
   /**
-   * Renames a file with an input dialog (stays in CodeGraphy view).
+   * Renames a file with an input dialog (with undo support).
    */
   private async _renameFile(filePath: string): Promise<void> {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) return;
 
-    const oldUri = vscode.Uri.joinPath(workspaceFolder.uri, filePath);
     const oldName = filePath.split('/').pop() || filePath;
-    
+
     const newName = await vscode.window.showInputBox({
       prompt: 'Enter new file name',
       value: oldName,
@@ -533,19 +534,22 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
     if (!newName || newName === oldName) return;
 
     const newPath = filePath.replace(/[^/]+$/, newName);
-    const newUri = vscode.Uri.joinPath(workspaceFolder.uri, newPath);
 
     try {
-      await vscode.workspace.fs.rename(oldUri, newUri);
-      // Refresh graph after rename
-      await this._analyzeAndSendData();
+      const action = new RenameFileAction(
+        filePath,
+        newPath,
+        workspaceFolder.uri,
+        () => this._analyzeAndSendData()
+      );
+      await getUndoManager().execute(action);
     } catch (error) {
       vscode.window.showErrorMessage(`Failed to rename: ${error}`);
     }
   }
 
   /**
-   * Creates a new file in the workspace.
+   * Creates a new file in the workspace (with undo support).
    */
   private async _createFile(directory: string): Promise<void> {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
@@ -559,14 +563,14 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
 
     if (fileName) {
       const filePath = directory === '.' ? fileName : `${directory}/${fileName}`;
-      const fileUri = vscode.Uri.joinPath(workspaceFolder.uri, filePath);
-      
+
       try {
-        await vscode.workspace.fs.writeFile(fileUri, new Uint8Array());
-        const document = await vscode.workspace.openTextDocument(fileUri);
-        await vscode.window.showTextDocument(document);
-        // Refresh graph after creation
-        await this._analyzeAndSendData();
+        const action = new CreateFileAction(
+          filePath,
+          workspaceFolder.uri,
+          () => this._analyzeAndSendData()
+        );
+        await getUndoManager().execute(action);
       } catch (error) {
         vscode.window.showErrorMessage(`Failed to create file: ${error}`);
       }

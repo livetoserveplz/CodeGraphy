@@ -5,3 +5,6 @@
 
 export { ToggleFavoriteAction } from './ToggleFavoriteAction';
 export { AddToExcludeAction } from './AddToExcludeAction';
+export { DeleteFilesAction } from './DeleteFilesAction';
+export { RenameFileAction } from './RenameFileAction';
+export { CreateFileAction } from './CreateFileAction';
