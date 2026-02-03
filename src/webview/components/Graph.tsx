@@ -488,6 +488,39 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark' }: G
         case 'REQUEST_EXPORT_PNG':
           exportAsPng(network);
           break;
+        case 'NODE_ACCESS_COUNT_UPDATED': {
+          // Update node's access count and recalculate sizes in real-time
+          const { nodeId, accessCount } = message.payload;
+          const currentData = dataRef.current;
+          
+          // Update the node's accessCount in our data reference
+          const nodeIndex = currentData.nodes.findIndex(n => n.id === nodeId);
+          if (nodeIndex !== -1) {
+            currentData.nodes[nodeIndex].accessCount = accessCount;
+            
+            // Only recalculate if we're in access-count mode
+            if (currentData.nodeSizeMode === 'access-count' && nodesRef.current) {
+              // Recalculate all node sizes (normalization may change)
+              const nodeSizes = calculateNodeSizes(
+                currentData.nodes,
+                currentData.edges,
+                'access-count'
+              );
+              
+              // Update all nodes with new sizes
+              currentData.nodes.forEach((node) => {
+                const visNode = toVisNode(
+                  node, 
+                  favoritesRef.current.has(node.id), 
+                  nodeSizes.get(node.id), 
+                  themeRef.current
+                );
+                nodesRef.current?.update(visNode);
+              });
+            }
+          }
+          break;
+        }
       }
     };
 

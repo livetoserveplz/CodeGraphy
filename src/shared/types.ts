@@ -220,7 +220,8 @@ export type ExtensionToWebviewMessage =
   | { type: 'FAVORITES_UPDATED'; payload: { favorites: string[] } }
   | { type: 'THEME_CHANGED'; payload: { kind: 'light' | 'dark' | 'high-contrast' } }
   | { type: 'FILE_INFO'; payload: IFileInfo }
-  | { type: 'REQUEST_EXPORT_PNG' };
+  | { type: 'REQUEST_EXPORT_PNG' }
+  | { type: 'NODE_ACCESS_COUNT_UPDATED'; payload: { nodeId: string; accessCount: number } };
 
 /**
  * Messages sent from the Webview to the Extension.
