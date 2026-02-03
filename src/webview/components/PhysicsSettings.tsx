@@ -3,13 +3,13 @@
  * @module webview/components/PhysicsSettings
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { IPhysicsSettings } from '../../shared/types';
 import { postMessage } from '../lib/vscodeApi';
 
 interface PhysicsSettingsProps {
   settings: IPhysicsSettings;
-  // onSettingsChange is no longer needed - we only use the round-trip through VSCode
+  onSettingsChange?: (settings: IPhysicsSettings) => void;
 }
 
 interface SliderConfig {
@@ -64,33 +64,16 @@ const SLIDERS: SliderConfig[] = [
   },
 ];
 
-export default function PhysicsSettings({ settings }: PhysicsSettingsProps): React.ReactElement {
+export default function PhysicsSettings({ settings, onSettingsChange }: PhysicsSettingsProps): React.ReactElement {
   const [isExpanded, setIsExpanded] = useState(false);
-  
-  // Local state for immediate slider feedback
-  // This prevents the double-update issue: we update local state immediately,
-  // and the round-trip through VSCode settings only updates the parent state
-  const [localSettings, setLocalSettings] = useState(settings);
-  
-  // Sync local state when props change (from VSCode settings or reset)
-  // Only update if values actually changed to prevent unnecessary re-renders
-  useEffect(() => {
-    setLocalSettings(prev => {
-      if (prev.gravitationalConstant === settings.gravitationalConstant &&
-          prev.centralGravity === settings.centralGravity &&
-          prev.springLength === settings.springLength &&
-          prev.springConstant === settings.springConstant &&
-          prev.damping === settings.damping) {
-        return prev; // Same values, keep existing reference
-      }
-      return settings;
-    });
-  }, [settings]);
 
   const handleSliderChange = (key: keyof IPhysicsSettings, value: number) => {
-    // Update local state immediately for smooth slider feedback
-    setLocalSettings(prev => ({ ...prev, [key]: value }));
-    // Persist to VSCode settings (round-trip will update parent state)
+    const newSettings = { ...settings, [key]: value };
+    // Update parent state immediately for live graph updates
+    if (onSettingsChange) {
+      onSettingsChange(newSettings);
+    }
+    // Persist to VSCode settings for saving
     postMessage({ type: 'UPDATE_PHYSICS_SETTING', payload: { key, value } });
   };
 
@@ -123,7 +106,7 @@ export default function PhysicsSettings({ settings }: PhysicsSettingsProps): Rea
                     {label}
                   </label>
                   <span className="text-xs text-zinc-500 font-mono">
-                    {typeof localSettings[key] === 'number' ? localSettings[key].toFixed(step < 1 ? 2 : 0) : localSettings[key]}
+                    {typeof settings[key] === 'number' ? settings[key].toFixed(step < 1 ? 2 : 0) : settings[key]}
                   </span>
                 </div>
                 <input
@@ -131,7 +114,7 @@ export default function PhysicsSettings({ settings }: PhysicsSettingsProps): Rea
                   min={min}
                   max={max}
                   step={step}
-                  value={localSettings[key]}
+                  value={settings[key]}
                   onChange={(e) => handleSliderChange(key, parseFloat(e.target.value))}
                   className="w-full h-1.5 bg-zinc-600 rounded-lg appearance-none cursor-pointer accent-blue-500"
                 />

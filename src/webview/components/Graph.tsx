@@ -1202,8 +1202,7 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark', bid
 
   /**
    * Update physics settings when they change.
-   * Must restart simulation for changes to take effect after stabilization.
-   * Uses deep comparison to avoid unnecessary restarts (fixes double-refresh issue).
+   * Uses deep comparison to avoid unnecessary restarts.
    */
   useEffect(() => {
     const network = networkRef.current;
@@ -1223,10 +1222,7 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark', bid
     // Store current settings for next comparison
     prevPhysicsRef.current = { ...physicsSettings };
 
-    // Apply new physics settings
-    // Note: setOptions() updates physics parameters live while simulation is running.
-    // After stabilization, changes won't be visible until user interacts with the graph,
-    // but this avoids the jarring "restart" effect from startSimulation().
+    // Apply new physics settings immediately
     network.setOptions({
       physics: {
         forceAtlas2Based: {
