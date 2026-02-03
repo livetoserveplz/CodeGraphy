@@ -73,8 +73,18 @@ export default function PhysicsSettings({ settings }: PhysicsSettingsProps): Rea
   const [localSettings, setLocalSettings] = useState(settings);
   
   // Sync local state when props change (from VSCode settings or reset)
+  // Only update if values actually changed to prevent unnecessary re-renders
   useEffect(() => {
-    setLocalSettings(settings);
+    setLocalSettings(prev => {
+      if (prev.gravitationalConstant === settings.gravitationalConstant &&
+          prev.centralGravity === settings.centralGravity &&
+          prev.springLength === settings.springLength &&
+          prev.springConstant === settings.springConstant &&
+          prev.damping === settings.damping) {
+        return prev; // Same values, keep existing reference
+      }
+      return settings;
+    });
   }, [settings]);
 
   const handleSliderChange = (key: keyof IPhysicsSettings, value: number) => {

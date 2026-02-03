@@ -140,7 +140,18 @@ export default function App(): React.ReactElement {
           setActiveViewId(message.payload.activeViewId);
           break;
         case 'PHYSICS_SETTINGS_UPDATED':
-          setPhysicsSettings(message.payload);
+          // Only update if values actually changed to prevent unnecessary re-renders
+          setPhysicsSettings(prev => {
+            const next = message.payload;
+            if (prev.gravitationalConstant === next.gravitationalConstant &&
+                prev.centralGravity === next.centralGravity &&
+                prev.springLength === next.springLength &&
+                prev.springConstant === next.springConstant &&
+                prev.damping === next.damping) {
+              return prev; // Return same reference to prevent re-render
+            }
+            return next;
+          });
           break;
         case 'DEPTH_LIMIT_UPDATED':
           setDepthLimit(message.payload.depthLimit);
