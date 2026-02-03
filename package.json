@@ -25,6 +25,48 @@
       {
         "command": "codegraphy.open",
         "title": "CodeGraphy: Open"
+      },
+      {
+        "command": "codegraphy.fitView",
+        "title": "CodeGraphy: Fit All Nodes in View"
+      },
+      {
+        "command": "codegraphy.zoomIn",
+        "title": "CodeGraphy: Zoom In"
+      },
+      {
+        "command": "codegraphy.zoomOut",
+        "title": "CodeGraphy: Zoom Out"
+      },
+      {
+        "command": "codegraphy.exportPng",
+        "title": "CodeGraphy: Export as PNG"
+      },
+      {
+        "command": "codegraphy.clearCache",
+        "title": "CodeGraphy: Clear Cache and Refresh"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "codegraphy.fitView",
+        "key": "0",
+        "when": "codegraphy.graphFocused"
+      },
+      {
+        "command": "codegraphy.zoomIn",
+        "key": "=",
+        "when": "codegraphy.graphFocused"
+      },
+      {
+        "command": "codegraphy.zoomIn",
+        "key": "shift+=",
+        "when": "codegraphy.graphFocused"
+      },
+      {
+        "command": "codegraphy.zoomOut",
+        "key": "-",
+        "when": "codegraphy.graphFocused"
       }
     ],
     "viewsContainers": {
@@ -44,6 +86,73 @@
           "name": "Graph"
         }
       ]
+    },
+    "configuration": {
+      "title": "CodeGraphy",
+      "properties": {
+        "codegraphy.maxFiles": {
+          "type": "number",
+          "default": 100,
+          "description": "Maximum number of files to analyze. Shows a warning if exceeded."
+        },
+        "codegraphy.include": {
+          "type": "array",
+          "items": "string",
+          "default": [
+            "**/*"
+          ],
+          "description": "Glob patterns for files to include in analysis."
+        },
+        "codegraphy.exclude": {
+          "type": "array",
+          "items": "string",
+          "default": [
+            "**/node_modules/**",
+            "**/dist/**",
+            "**/build/**",
+            "**/out/**",
+            "**/.git/**",
+            "**/coverage/**",
+            "**/*.min.js",
+            "**/*.bundle.js",
+            "**/*.map"
+          ],
+          "description": "Glob patterns for files to exclude from analysis."
+        },
+        "codegraphy.respectGitignore": {
+          "type": "boolean",
+          "default": true,
+          "description": "Also exclude files matched by .gitignore."
+        },
+        "codegraphy.showOrphans": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show files that have no connections (no imports and not imported)."
+        },
+        "codegraphy.plugins": {
+          "type": "array",
+          "items": "string",
+          "default": [],
+          "description": "List of CodeGraphy plugin extension names to enable (e.g., 'codegraphy-rust')."
+        },
+        "codegraphy.fileColors": {
+          "type": "object",
+          "default": {},
+          "description": "Custom colors for file extensions. Maps extension (e.g., '.ts') to hex color (e.g., '#93C5FD'). Overrides plugin and generated colors.",
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^#[0-9A-Fa-f]{6}$"
+          }
+        },
+        "codegraphy.favorites": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "List of favorite file paths. Favorited files are displayed with a yellow outline in the graph."
+        }
+      }
     }
   },
   "scripts": {
@@ -57,37 +166,50 @@
     "dev": "npm run watch",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint src --ext ts,tsx",
+    "lint": "eslint src",
     "typecheck": "tsc --noEmit",
     "prepare": "husky install"
   },
   "devDependencies": {
+    "@eslint/js": "^9.0.0",
     "@testing-library/jest-dom": "^6.2.0",
     "@testing-library/react": "^14.1.2",
     "@types/node": "^20.11.0",
     "@types/react": "^18.2.48",
     "@types/react-dom": "^18.2.18",
     "@types/vscode": "^1.85.0",
-    "@typescript-eslint/eslint-plugin": "^6.19.0",
-    "@typescript-eslint/parser": "^6.19.0",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.17",
     "concurrently": "^8.2.2",
-    "esbuild": "^0.19.11",
-    "eslint": "^8.56.0",
-    "eslint-plugin-react": "^7.33.2",
-    "eslint-plugin-react-hooks": "^4.6.0",
+    "esbuild": "^0.25.0",
+    "eslint": "^9.0.0",
+    "eslint-plugin-react": "^7.37.0",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "globals": "^15.0.0",
     "husky": "^9.0.0",
-    "jsdom": "^23.2.0",
+    "jsdom": "^25.0.0",
     "lint-staged": "^15.0.0",
     "postcss": "^8.4.33",
     "tailwindcss": "^3.4.1",
     "typescript": "^5.3.3",
-    "vite": "^5.0.12",
-    "vitest": "^1.2.1"
+    "typescript-eslint": "^8.0.0",
+    "vite": "^6.2.0",
+    "vitest": "^3.0.0"
   },
   "dependencies": {
+    "@radix-ui/react-context-menu": "^2.2.16",
+    "@radix-ui/react-slot": "^1.2.4",
+    "@radix-ui/react-tooltip": "^1.2.8",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "distinct-colors": "^3.0.0",
+    "fuse.js": "^7.1.0",
+    "ignore": "^7.0.5",
+    "minimatch": "^10.1.1",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "tailwind-merge": "^3.4.0",
+    "vis-data": "^8.0.3",
+    "vis-network": "^10.0.2"
   }
 }

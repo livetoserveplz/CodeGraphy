@@ -1,0 +1,22 @@
+{
+  // CodeGraphy Settings
+  "codegraphy.maxFiles": 100,
+  "codegraphy.include": ["**/*"],
+  "codegraphy.exclude": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/.git/**"
+  ],
+  "codegraphy.respectGitignore": true,
+  "codegraphy.showOrphans": true,
+  "codegraphy.favorites": ["src/index.ts"],
+  "codegraphy.plugins": [],
+  // Custom file colors (overrides plugin/generated colors)
+  "codegraphy.fileColors": {
+    // Example: ".myext": "#FF5733"
+  },
+
+  // TypeScript settings for the fixture
+  "typescript.tsdk": "node_modules/typescript/lib"
+}

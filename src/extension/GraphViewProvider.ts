@@ -1,12 +1,94 @@
-import * as vscode from 'vscode';
+/**
+ * @fileoverview Provides the webview panel for displaying the dependency graph.
+ * Handles communication between the extension and the React webview,
+ * including graph data updates and position persistence.
+ * @module extension/GraphViewProvider
+ */
 
+import * as vscode from 'vscode';
+import {
+  IGraphData,
+  ExtensionToWebviewMessage,
+  WebviewToExtensionMessage,
+} from '../shared/types';
+import { WorkspaceAnalyzer } from './WorkspaceAnalyzer';
+
+/** Storage key for persisted node positions in workspace state */
+const POSITIONS_KEY = 'codegraphy.nodePositions';
+
+/** Storage key for file visit counts in workspace state */
+const VISITS_KEY = 'codegraphy.fileVisits';
+
+/**
+ * Map of node IDs to their persisted positions.
+ * Stored in VSCode workspace state for persistence across sessions.
+ */
+interface NodePositions {
+  [nodeId: string]: { x: number; y: number };
+}
+
+/**
+ * Provides the webview panel that displays the CodeGraphy dependency graph.
+ * 
+ * This class implements `vscode.WebviewViewProvider` to register as a sidebar
+ * view provider. It manages:
+ * - Webview HTML content generation
+ * - Message passing between extension and webview
+ * - Node position persistence to workspace state
+ * - File opening on node double-click
+ * 
+ * @example
+ * ```typescript
+ * // Registration in extension activation
+ * const provider = new GraphViewProvider(context.extensionUri, context);
+ * context.subscriptions.push(
+ *   vscode.window.registerWebviewViewProvider(
+ *     GraphViewProvider.viewType,
+ *     provider
+ *   )
+ * );
+ * ```
+ */
 export class GraphViewProvider implements vscode.WebviewViewProvider {
+  /** The view type identifier used in package.json contribution */
   public static readonly viewType = 'codegraphy.graphView';
 
+  /** Reference to the webview view, undefined until resolved */
   private _view?: vscode.WebviewView;
+  
+  /** Current graph data being displayed */
+  private _graphData: IGraphData = { nodes: [], edges: [] };
+  
+  /** Timeout handle for debounced position saves */
+  private _saveTimeout?: NodeJS.Timeout;
 
-  constructor(private readonly _extensionUri: vscode.Uri) {}
+  /** Workspace analyzer for real file discovery */
+  private _analyzer?: WorkspaceAnalyzer;
 
+  /** Whether the analyzer has been initialized */
+  private _analyzerInitialized = false;
+
+  /**
+   * Creates a new GraphViewProvider.
+   * 
+   * @param _extensionUri - URI of the extension's installation directory
+   * @param _context - Extension context for accessing workspace state
+   */
+  constructor(
+    private readonly _extensionUri: vscode.Uri,
+    private readonly _context: vscode.ExtensionContext
+  ) {
+    this._analyzer = new WorkspaceAnalyzer(_context);
+  }
+
+  /**
+   * Called by VSCode when the webview view needs to be resolved.
+   * Sets up the webview options, HTML content, and message listeners.
+   * 
+   * @param webviewView - The webview view to resolve
+   * @param _context - Context for the webview view resolution
+   * @param _token - Cancellation token
+   */
   public resolveWebviewView(
     webviewView: vscode.WebviewView,
     _context: vscode.WebviewViewResolveContext,
@@ -19,30 +101,605 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
       localResourceRoots: [this._extensionUri],
     };
 
+    // Set up message listener BEFORE loading HTML to avoid race condition
+    this._setWebviewMessageListener(webviewView.webview);
+
     webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
-    this._setWebviewMessageListener(webviewView.webview);
+    // Listen for visibility changes (e.g., switching between views)
+    // When view becomes visible again, re-send the graph data
+    webviewView.onDidChangeVisibility(() => {
+      if (webviewView.visible) {
+        console.log('[CodeGraphy] View became visible, re-sending data');
+        this._analyzeAndSendData();
+      }
+    });
+
+    // Proactively start analysis - don't rely solely on WEBVIEW_READY
+    // The webview might send WEBVIEW_READY before listener is ready, or vice versa
+    // This ensures data is always sent
+    this._analyzeAndSendData();
   }
 
-  public postMessage(message: unknown): void {
-    if (this._view) {
-      this._view.webview.postMessage(message);
+  /**
+   * Updates the graph data and notifies the webview.
+   * Applies any persisted positions before sending to webview.
+   * 
+   * @param data - New graph data to display
+   * 
+   * @example
+   * ```typescript
+   * provider.updateGraphData({
+   *   nodes: [{ id: 'app.ts', label: 'app.ts', color: '#93C5FD' }],
+   *   edges: []
+   * });
+   * ```
+   */
+  public updateGraphData(data: IGraphData): void {
+    this._graphData = data;
+    this._applyPersistedPositions();
+    this._sendMessage({ type: 'GRAPH_DATA_UPDATED', payload: this._graphData });
+  }
+
+  /**
+   * Returns the current graph data being displayed.
+   * 
+   * @returns Current graph data with nodes and edges
+   */
+  public getGraphData(): IGraphData {
+    return this._graphData;
+  }
+
+  /**
+   * Re-analyzes the workspace and updates the graph.
+   * Can be called when files change or settings are updated.
+   */
+  public async refresh(): Promise<void> {
+    await this._analyzeAndSendData();
+  }
+
+  /**
+   * Clears the analysis cache and re-analyzes.
+   */
+  public async clearCacheAndRefresh(): Promise<void> {
+    this._analyzer?.clearCache();
+    await this._analyzeAndSendData();
+  }
+
+  /**
+   * Analyzes the workspace and sends data to webview.
+   */
+  private async _analyzeAndSendData(): Promise<void> {
+    console.log('[CodeGraphy] _analyzeAndSendData called');
+    
+    if (!this._analyzer) {
+      // No analyzer - send empty data
+      console.log('[CodeGraphy] No analyzer available');
+      this._graphData = { nodes: [], edges: [] };
+      this._sendMessage({ type: 'GRAPH_DATA_UPDATED', payload: this._graphData });
+      return;
+    }
+
+    // Initialize analyzer if needed
+    if (!this._analyzerInitialized) {
+      await this._analyzer.initialize();
+      this._analyzerInitialized = true;
+    }
+
+    // Check if workspace is open
+    const hasWorkspace = vscode.workspace.workspaceFolders && 
+                         vscode.workspace.workspaceFolders.length > 0;
+
+    if (!hasWorkspace) {
+      // No workspace - send empty data
+      console.log('[CodeGraphy] No workspace open');
+      this._graphData = { nodes: [], edges: [] };
+      this._sendMessage({ type: 'GRAPH_DATA_UPDATED', payload: this._graphData });
+      return;
+    }
+
+    // Analyze real workspace
+    try {
+      this._graphData = await this._analyzer.analyze();
+      this._applyPersistedPositions();
+      this._sendMessage({ type: 'GRAPH_DATA_UPDATED', payload: this._graphData });
+    } catch (error) {
+      console.error('[CodeGraphy] Analysis failed:', error);
+      // Send empty data on error
+      this._graphData = { nodes: [], edges: [] };
+      this._sendMessage({ type: 'GRAPH_DATA_UPDATED', payload: this._graphData });
     }
   }
 
+  /**
+   * Send a command to the webview (for keyboard shortcuts)
+   * 
+   * @param command - The command to send (FIT_VIEW, ZOOM_IN, ZOOM_OUT)
+   */
+  public sendCommand(command: 'FIT_VIEW' | 'ZOOM_IN' | 'ZOOM_OUT'): void {
+    this._sendMessage({ type: command });
+  }
+
+  /**
+   * Request the webview to export as PNG.
+   */
+  public requestExportPng(): void {
+    this._sendMessage({ type: 'REQUEST_EXPORT_PNG' });
+  }
+
+  /**
+   * Sends a message to the webview.
+   * 
+   * @param message - Message to send to the webview
+   */
+  private _sendMessage(message: ExtensionToWebviewMessage): void {
+    if (this._view) {
+      console.log('[CodeGraphy] Sending message:', message.type);
+      this._view.webview.postMessage(message);
+    } else {
+      console.log('[CodeGraphy] Cannot send message, no view:', message.type);
+    }
+  }
+
+  /**
+   * Loads persisted node positions from workspace state.
+   * 
+   * @returns Map of node IDs to positions, empty object if none saved
+   */
+  private _getPersistedPositions(): NodePositions {
+    const positions = this._context.workspaceState.get<NodePositions>(POSITIONS_KEY) ?? {};
+    console.log('[CodeGraphy] Loading positions:', Object.keys(positions).length, 'nodes');
+    return positions;
+  }
+
+  /**
+   * Saves node positions to workspace state with debouncing.
+   * Waits 500ms after the last call before actually saving to avoid
+   * excessive writes during physics simulation or rapid dragging.
+   */
+  private _savePositions(): void {
+    if (this._saveTimeout) {
+      clearTimeout(this._saveTimeout);
+    }
+    this._saveTimeout = setTimeout(async () => {
+      const positions: NodePositions = {};
+      for (const node of this._graphData.nodes) {
+        if (node.x !== undefined && node.y !== undefined) {
+          positions[node.id] = { x: node.x, y: node.y };
+        }
+      }
+      await this._context.workspaceState.update(POSITIONS_KEY, positions);
+      console.log('[CodeGraphy] Positions saved:', Object.keys(positions).length, 'nodes');
+    }, 500);
+  }
+
+  /**
+   * Applies persisted positions to the current graph data.
+   * Called before sending graph data to webview to restore layout.
+   */
+  private _applyPersistedPositions(): void {
+    const positions = this._getPersistedPositions();
+    let applied = 0;
+    for (const node of this._graphData.nodes) {
+      const savedPos = positions[node.id];
+      if (savedPos) {
+        node.x = savedPos.x;
+        node.y = savedPos.y;
+        applied++;
+      }
+    }
+    console.log(`[CodeGraphy] Applied ${applied}/${this._graphData.nodes.length} saved positions`);
+  }
+
+  /**
+   * Sets up the message listener for webview-to-extension communication.
+   * Handles all message types defined in WebviewToExtensionMessage.
+   * 
+   * @param webview - The webview to listen to
+   */
   private _setWebviewMessageListener(webview: vscode.Webview): void {
-    webview.onDidReceiveMessage((message: { type: string; payload?: unknown }) => {
+    webview.onDidReceiveMessage(async (message: WebviewToExtensionMessage) => {
       switch (message.type) {
-        case 'ready':
-          this.postMessage({ type: 'init', payload: { version: '0.1.0' } });
+        case 'WEBVIEW_READY':
+          // Analyze workspace and send graph data
+          this._analyzeAndSendData();
+          // Send current favorites
+          this._sendFavorites();
           break;
-        case 'log':
-          console.log('[CodeGraphy Webview]', message.payload);
+
+        case 'NODE_SELECTED':
+          console.log('[CodeGraphy] Node selected:', message.payload.nodeId);
+          break;
+
+        case 'NODE_DOUBLE_CLICKED':
+          this._openFile(message.payload.nodeId);
+          break;
+
+        case 'POSITIONS_UPDATED':
+          this._handlePositionsUpdated(message.payload.positions);
+          break;
+          
+        // Context menu actions
+        case 'OPEN_FILE':
+          this._openFile(message.payload.path);
+          break;
+          
+        case 'REVEAL_IN_EXPLORER':
+          this._revealInExplorer(message.payload.path);
+          break;
+          
+        case 'COPY_TO_CLIPBOARD':
+          this._copyToClipboard(message.payload.text);
+          break;
+          
+        case 'DELETE_FILES':
+          this._deleteFiles(message.payload.paths);
+          break;
+          
+        case 'RENAME_FILE':
+          this._renameFile(message.payload.path);
+          break;
+          
+        case 'CREATE_FILE':
+          this._createFile(message.payload.directory);
+          break;
+          
+        case 'TOGGLE_FAVORITE':
+          this._toggleFavorites(message.payload.paths);
+          break;
+          
+        case 'ADD_TO_EXCLUDE':
+          this._addToExclude(message.payload.patterns);
+          break;
+          
+        case 'REFRESH_GRAPH':
+          await this._analyzeAndSendData();
+          break;
+          
+        case 'GET_FILE_INFO':
+          this._getFileInfo(message.payload.path);
+          break;
+          
+        case 'EXPORT_PNG':
+          await this._saveExportedPng(message.payload.dataUrl, message.payload.filename);
           break;
       }
     });
   }
 
+  /**
+   * Opens a file in the VSCode editor.
+   * Shows an info message for mock files that don't exist on disk.
+   * 
+   * @param filePath - Workspace-relative path to the file
+   */
+  private async _openFile(filePath: string): Promise<void> {
+    try {
+      const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+      if (!workspaceFolder) {
+        // Mock data - show info message
+        vscode.window.showInformationMessage(`Mock file: ${filePath}`);
+        return;
+      }
+
+      const fileUri = vscode.Uri.joinPath(workspaceFolder.uri, filePath);
+      
+      // Check if file exists
+      try {
+        await vscode.workspace.fs.stat(fileUri);
+      } catch {
+        // File doesn't exist (mock data)
+        vscode.window.showInformationMessage(`Mock file: ${filePath}`);
+        return;
+      }
+
+      const document = await vscode.workspace.openTextDocument(fileUri);
+      await vscode.window.showTextDocument(document);
+      
+      // Track visit
+      await this._incrementVisitCount(filePath);
+    } catch (error) {
+      console.error('[CodeGraphy] Failed to open file:', error);
+      vscode.window.showErrorMessage(`Could not open file: ${filePath}`);
+    }
+  }
+
+  /**
+   * Handles bulk position updates, typically after physics stabilization.
+   * Updates all node positions in memory and triggers a debounced save.
+   * 
+   * @param positions - Map of node IDs to their new positions
+   */
+  private _handlePositionsUpdated(positions: Record<string, { x: number; y: number }>): void {
+    for (const node of this._graphData.nodes) {
+      const pos = positions[node.id];
+      if (pos) {
+        node.x = pos.x;
+        node.y = pos.y;
+      }
+    }
+    this._savePositions();
+  }
+
+  /**
+   * Reveals a file in the VSCode explorer sidebar.
+   */
+  private async _revealInExplorer(filePath: string): Promise<void> {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) return;
+
+    const fileUri = vscode.Uri.joinPath(workspaceFolder.uri, filePath);
+    await vscode.commands.executeCommand('revealInExplorer', fileUri);
+  }
+
+  /**
+   * Copies text to the clipboard.
+   */
+  private async _copyToClipboard(text: string): Promise<void> {
+    // Handle absolute path request
+    if (text.startsWith('absolute:')) {
+      const relativePath = text.slice(9);
+      const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+      if (workspaceFolder) {
+        const absolutePath = vscode.Uri.joinPath(workspaceFolder.uri, relativePath).fsPath;
+        await vscode.env.clipboard.writeText(absolutePath);
+        return;
+      }
+    }
+    await vscode.env.clipboard.writeText(text);
+  }
+
+  /**
+   * Deletes files with confirmation.
+   */
+  private async _deleteFiles(paths: string[]): Promise<void> {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) return;
+
+    const count = paths.length;
+    const message = count === 1
+      ? `Are you sure you want to delete "${paths[0]}"?`
+      : `Are you sure you want to delete ${count} files?`;
+
+    const confirm = await vscode.window.showWarningMessage(
+      message,
+      { modal: true },
+      'Delete'
+    );
+
+    if (confirm === 'Delete') {
+      for (const filePath of paths) {
+        const fileUri = vscode.Uri.joinPath(workspaceFolder.uri, filePath);
+        try {
+          await vscode.workspace.fs.delete(fileUri, { useTrash: true });
+        } catch (error) {
+          vscode.window.showErrorMessage(`Failed to delete ${filePath}: ${error}`);
+        }
+      }
+      // Refresh graph after deletion
+      await this._analyzeAndSendData();
+    }
+  }
+
+  /**
+   * Renames a file with an input dialog (stays in CodeGraphy view).
+   */
+  private async _renameFile(filePath: string): Promise<void> {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) return;
+
+    const oldUri = vscode.Uri.joinPath(workspaceFolder.uri, filePath);
+    const oldName = filePath.split('/').pop() || filePath;
+    
+    const newName = await vscode.window.showInputBox({
+      prompt: 'Enter new file name',
+      value: oldName,
+      valueSelection: [0, oldName.lastIndexOf('.') > 0 ? oldName.lastIndexOf('.') : oldName.length],
+      ignoreFocusOut: true, // Prevent dialog from closing on mouse move or focus loss
+    });
+
+    if (!newName || newName === oldName) return;
+
+    const newPath = filePath.replace(/[^/]+$/, newName);
+    const newUri = vscode.Uri.joinPath(workspaceFolder.uri, newPath);
+
+    try {
+      await vscode.workspace.fs.rename(oldUri, newUri);
+      // Refresh graph after rename
+      await this._analyzeAndSendData();
+    } catch (error) {
+      vscode.window.showErrorMessage(`Failed to rename: ${error}`);
+    }
+  }
+
+  /**
+   * Creates a new file in the workspace.
+   */
+  private async _createFile(directory: string): Promise<void> {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) return;
+
+    const fileName = await vscode.window.showInputBox({
+      prompt: 'Enter file name',
+      placeHolder: 'newfile.ts',
+      ignoreFocusOut: true, // Prevent dialog from closing on mouse move or focus loss
+    });
+
+    if (fileName) {
+      const filePath = directory === '.' ? fileName : `${directory}/${fileName}`;
+      const fileUri = vscode.Uri.joinPath(workspaceFolder.uri, filePath);
+      
+      try {
+        await vscode.workspace.fs.writeFile(fileUri, new Uint8Array());
+        const document = await vscode.workspace.openTextDocument(fileUri);
+        await vscode.window.showTextDocument(document);
+        // Refresh graph after creation
+        await this._analyzeAndSendData();
+      } catch (error) {
+        vscode.window.showErrorMessage(`Failed to create file: ${error}`);
+      }
+    }
+  }
+
+  /**
+   * Save exported PNG to file.
+   */
+  private async _saveExportedPng(dataUrl: string, filename?: string): Promise<void> {
+    try {
+      // Prompt user for save location
+      const defaultFilename = filename || `codegraphy-${Date.now()}.png`;
+      const saveUri = await vscode.window.showSaveDialog({
+        defaultUri: vscode.Uri.file(defaultFilename),
+        filters: { 'PNG Images': ['png'] },
+        saveLabel: 'Export',
+        title: 'Export Graph as PNG',
+      });
+
+      if (!saveUri) return; // User cancelled
+
+      // Convert data URL to binary
+      const base64Data = dataUrl.replace(/^data:image\/png;base64,/, '');
+      const buffer = Buffer.from(base64Data, 'base64');
+
+      // Write file
+      await vscode.workspace.fs.writeFile(saveUri, buffer);
+      
+      // Show success message with option to open
+      const action = await vscode.window.showInformationMessage(
+        `Graph exported to ${saveUri.fsPath}`,
+        'Open File',
+        'Open Folder'
+      );
+
+      if (action === 'Open File') {
+        await vscode.commands.executeCommand('vscode.open', saveUri);
+      } else if (action === 'Open Folder') {
+        await vscode.commands.executeCommand('revealFileInOS', saveUri);
+      }
+    } catch (error) {
+      vscode.window.showErrorMessage(`Failed to export PNG: ${error}`);
+    }
+  }
+
+  /**
+   * Toggles favorite status for files.
+   */
+  private async _toggleFavorites(paths: string[]): Promise<void> {
+    const config = vscode.workspace.getConfiguration('codegraphy');
+    const favorites = new Set<string>(config.get<string[]>('favorites', []));
+
+    for (const path of paths) {
+      if (favorites.has(path)) {
+        favorites.delete(path);
+      } else {
+        favorites.add(path);
+      }
+    }
+
+    await config.update('favorites', Array.from(favorites), vscode.ConfigurationTarget.Workspace);
+    this._sendFavorites();
+  }
+
+  /**
+   * Sends current favorites to the webview.
+   */
+  private _sendFavorites(): void {
+    const config = vscode.workspace.getConfiguration('codegraphy');
+    const favorites = config.get<string[]>('favorites', []);
+    this._sendMessage({ type: 'FAVORITES_UPDATED', payload: { favorites } });
+  }
+
+  /**
+   * Gets file info and sends it to the webview.
+   */
+  private async _getFileInfo(filePath: string): Promise<void> {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) return;
+
+    try {
+      const fileUri = vscode.Uri.joinPath(workspaceFolder.uri, filePath);
+      const stat = await vscode.workspace.fs.stat(fileUri);
+
+      // Count connections from graph data
+      let incomingCount = 0;
+      let outgoingCount = 0;
+      
+      for (const edge of this._graphData.edges) {
+        if (edge.to === filePath) incomingCount++;
+        if (edge.from === filePath) outgoingCount++;
+      }
+
+      // Get plugin name
+      let plugin: string | undefined;
+      if (this._analyzer) {
+        const registry = (this._analyzer as unknown as { _registry?: { getPluginForFile?: (path: string) => { plugin?: { name?: string } } | undefined } })._registry;
+        if (registry?.getPluginForFile) {
+          const pluginInfo = registry.getPluginForFile(filePath);
+          plugin = pluginInfo?.plugin?.name;
+        }
+      }
+
+      // Get visit count
+      const visits = this._getVisitCount(filePath);
+
+      this._sendMessage({
+        type: 'FILE_INFO',
+        payload: {
+          path: filePath,
+          size: stat.size,
+          lastModified: stat.mtime,
+          incomingCount,
+          outgoingCount,
+          plugin,
+          visits,
+        },
+      });
+    } catch (error) {
+      console.error('[CodeGraphy] Failed to get file info:', error);
+    }
+  }
+
+  /**
+   * Gets the visit count for a file.
+   */
+  private _getVisitCount(filePath: string): number {
+    const visits = this._context.workspaceState.get<Record<string, number>>(VISITS_KEY) ?? {};
+    return visits[filePath] ?? 0;
+  }
+
+  /**
+   * Increments the visit count for a file.
+   */
+  private async _incrementVisitCount(filePath: string): Promise<void> {
+    const visits = this._context.workspaceState.get<Record<string, number>>(VISITS_KEY) ?? {};
+    visits[filePath] = (visits[filePath] ?? 0) + 1;
+    await this._context.workspaceState.update(VISITS_KEY, visits);
+  }
+
+  /**
+   * Adds patterns to the exclude list.
+   */
+  private async _addToExclude(patterns: string[]): Promise<void> {
+    const config = vscode.workspace.getConfiguration('codegraphy');
+    const currentExclude = config.get<string[]>('exclude', []);
+    
+    // Convert file paths to glob patterns
+    const newPatterns = patterns.map(p => `**/${p}`);
+    const mergedExclude = [...new Set([...currentExclude, ...newPatterns])];
+
+    await config.update('exclude', mergedExclude, vscode.ConfigurationTarget.Workspace);
+    
+    // Refresh graph after adding excludes
+    await this._analyzeAndSendData();
+  }
+
+  /**
+   * Generates the HTML content for the webview.
+   * Includes proper CSP headers and loads the React app bundle.
+   * 
+   * @param webview - The webview to generate HTML for
+   * @returns Complete HTML document as a string
+   */
   private _getHtmlForWebview(webview: vscode.Webview): string {
     const scriptUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this._extensionUri, 'dist', 'webview', 'index.js')
@@ -70,6 +727,12 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
   }
 }
 
+/**
+ * Generates a random nonce for CSP script-src.
+ * Used to allow only specific inline scripts in the webview.
+ * 
+ * @returns 32-character random alphanumeric string
+ */
 function getNonce(): string {
   let text = '';
   const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
