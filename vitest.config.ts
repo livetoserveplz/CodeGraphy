@@ -9,6 +9,10 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['tests/**/*.test.{ts,tsx}'],
     setupFiles: ['./tests/setup.ts'],
+    testTimeout: 30000,
+    hookTimeout: 10000,
+    teardownTimeout: 5000,
+    pool: 'forks',
     coverage: {
       reporter: ['text', 'html'],
       include: ['src/**/*.{ts,tsx}'],
