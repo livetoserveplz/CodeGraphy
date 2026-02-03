@@ -41,6 +41,9 @@ interface IAnalysisCache {
 const CACHE_KEY = 'codegraphy.analysisCache';
 const CACHE_VERSION = '1.4.0'; // Bumped for file size caching
 
+/** Storage key for file visit counts in workspace state (shared with GraphViewProvider) */
+const VISITS_KEY = 'codegraphy.fileVisits';
+
 /**
  * Orchestrates workspace analysis.
  * 
@@ -250,6 +253,9 @@ export class WorkspaceAnalyzer {
     // Get node size mode from settings
     const nodeSizeMode = this._config.nodeSizeBy;
 
+    // Get visit counts from workspace state (for access-count mode)
+    const visitCounts = this._context.workspaceState.get<Record<string, number>>(VISITS_KEY) ?? {};
+
     // First pass: create nodes and track connections
     for (const [filePath, connections] of fileConnections) {
       nodeIds.add(filePath);
@@ -289,6 +295,7 @@ export class WorkspaceAnalyzer {
         label: path.basename(filePath),
         color,
         fileSize: cached?.size,
+        accessCount: visitCounts[filePath] ?? 0,
       });
     }
 

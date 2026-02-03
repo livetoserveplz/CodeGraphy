@@ -16,6 +16,9 @@ import { WorkspaceAnalyzer } from './WorkspaceAnalyzer';
 /** Storage key for persisted node positions in workspace state */
 const POSITIONS_KEY = 'codegraphy.nodePositions';
 
+/** Storage key for file visit counts in workspace state */
+const VISITS_KEY = 'codegraphy.fileVisits';
+
 /**
  * Map of node IDs to their persisted positions.
  * Stored in VSCode workspace state for persistence across sessions.
@@ -218,6 +221,13 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
+   * Request the webview to export as PNG.
+   */
+  public requestExportPng(): void {
+    this._sendMessage({ type: 'REQUEST_EXPORT_PNG' });
+  }
+
+  /**
    * Sends a message to the webview.
    * 
    * @param message - Message to send to the webview
@@ -347,7 +357,11 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
           break;
           
         case 'GET_FILE_INFO':
-          // TODO: Implement file info for tooltips
+          this._getFileInfo(message.payload.path);
+          break;
+          
+        case 'EXPORT_PNG':
+          await this._saveExportedPng(message.payload.dataUrl, message.payload.filename);
           break;
       }
     });
@@ -381,6 +395,9 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
 
       const document = await vscode.workspace.openTextDocument(fileUri);
       await vscode.window.showTextDocument(document);
+      
+      // Track visit
+      await this._incrementVisitCount(filePath);
     } catch (error) {
       console.error('[CodeGraphy] Failed to open file:', error);
       vscode.window.showErrorMessage(`Could not open file: ${filePath}`);
@@ -525,6 +542,46 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
+   * Save exported PNG to file.
+   */
+  private async _saveExportedPng(dataUrl: string, filename?: string): Promise<void> {
+    try {
+      // Prompt user for save location
+      const defaultFilename = filename || `codegraphy-${Date.now()}.png`;
+      const saveUri = await vscode.window.showSaveDialog({
+        defaultUri: vscode.Uri.file(defaultFilename),
+        filters: { 'PNG Images': ['png'] },
+        saveLabel: 'Export',
+        title: 'Export Graph as PNG',
+      });
+
+      if (!saveUri) return; // User cancelled
+
+      // Convert data URL to binary
+      const base64Data = dataUrl.replace(/^data:image\/png;base64,/, '');
+      const buffer = Buffer.from(base64Data, 'base64');
+
+      // Write file
+      await vscode.workspace.fs.writeFile(saveUri, buffer);
+      
+      // Show success message with option to open
+      const action = await vscode.window.showInformationMessage(
+        `Graph exported to ${saveUri.fsPath}`,
+        'Open File',
+        'Open Folder'
+      );
+
+      if (action === 'Open File') {
+        await vscode.commands.executeCommand('vscode.open', saveUri);
+      } else if (action === 'Open Folder') {
+        await vscode.commands.executeCommand('revealFileInOS', saveUri);
+      }
+    } catch (error) {
+      vscode.window.showErrorMessage(`Failed to export PNG: ${error}`);
+    }
+  }
+
+  /**
    * Toggles favorite status for files.
    */
   private async _toggleFavorites(paths: string[]): Promise<void> {
@@ -550,6 +607,73 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
     const config = vscode.workspace.getConfiguration('codegraphy');
     const favorites = config.get<string[]>('favorites', []);
     this._sendMessage({ type: 'FAVORITES_UPDATED', payload: { favorites } });
+  }
+
+  /**
+   * Gets file info and sends it to the webview.
+   */
+  private async _getFileInfo(filePath: string): Promise<void> {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) return;
+
+    try {
+      const fileUri = vscode.Uri.joinPath(workspaceFolder.uri, filePath);
+      const stat = await vscode.workspace.fs.stat(fileUri);
+
+      // Count connections from graph data
+      let incomingCount = 0;
+      let outgoingCount = 0;
+      
+      for (const edge of this._graphData.edges) {
+        if (edge.to === filePath) incomingCount++;
+        if (edge.from === filePath) outgoingCount++;
+      }
+
+      // Get plugin name
+      let plugin: string | undefined;
+      if (this._analyzer) {
+        const registry = (this._analyzer as unknown as { _registry?: { getPluginForFile?: (path: string) => { plugin?: { name?: string } } | undefined } })._registry;
+        if (registry?.getPluginForFile) {
+          const pluginInfo = registry.getPluginForFile(filePath);
+          plugin = pluginInfo?.plugin?.name;
+        }
+      }
+
+      // Get visit count
+      const visits = this._getVisitCount(filePath);
+
+      this._sendMessage({
+        type: 'FILE_INFO',
+        payload: {
+          path: filePath,
+          size: stat.size,
+          lastModified: stat.mtime,
+          incomingCount,
+          outgoingCount,
+          plugin,
+          visits,
+        },
+      });
+    } catch (error) {
+      console.error('[CodeGraphy] Failed to get file info:', error);
+    }
+  }
+
+  /**
+   * Gets the visit count for a file.
+   */
+  private _getVisitCount(filePath: string): number {
+    const visits = this._context.workspaceState.get<Record<string, number>>(VISITS_KEY) ?? {};
+    return visits[filePath] ?? 0;
+  }
+
+  /**
+   * Increments the visit count for a file.
+   */
+  private async _incrementVisitCount(filePath: string): Promise<void> {
+    const visits = this._context.workspaceState.get<Record<string, number>>(VISITS_KEY) ?? {};
+    visits[filePath] = (visits[filePath] ?? 0) + 1;
+    await this._context.workspaceState.update(VISITS_KEY, visits);
   }
 
   /**
