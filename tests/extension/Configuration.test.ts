@@ -118,6 +118,7 @@ describe('Configuration', () => {
         plugins: [],
         fileColors: {},
         bidirectionalEdges: 'separate',
+        nodeSizeBy: 'connections',
       });
     });
 

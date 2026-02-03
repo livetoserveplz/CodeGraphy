@@ -161,6 +161,23 @@
             "Show a single bidirectional arrow with arrowheads on both ends"
           ],
           "description": "How to display bidirectional connections (when A imports B and B imports A)."
+        },
+        "codegraphy.nodeSizeBy": {
+          "type": "string",
+          "enum": [
+            "connections",
+            "file-size",
+            "access-count",
+            "uniform"
+          ],
+          "enumDescriptions": [
+            "More connections = larger node (default)",
+            "Larger files = larger nodes",
+            "Frequently opened files = larger nodes",
+            "All nodes same size"
+          ],
+          "default": "connections",
+          "description": "What determines the size of nodes in the graph."
         }
       }
     }
@@ -177,7 +194,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint src",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
@@ -195,7 +213,9 @@
     "eslint-plugin-react": "^7.37.0",
     "eslint-plugin-react-hooks": "^5.0.0",
     "globals": "^15.0.0",
+    "husky": "^9.0.0",
     "jsdom": "^25.0.0",
+    "lint-staged": "^15.0.0",
     "postcss": "^8.4.33",
     "tailwindcss": "^3.4.1",
     "typescript": "^5.3.3",
