@@ -1224,6 +1224,9 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark', bid
     prevPhysicsRef.current = { ...physicsSettings };
 
     // Apply new physics settings
+    // Note: setOptions() updates physics parameters live while simulation is running.
+    // After stabilization, changes won't be visible until user interacts with the graph,
+    // but this avoids the jarring "restart" effect from startSimulation().
     network.setOptions({
       physics: {
         forceAtlas2Based: {
@@ -1235,11 +1238,6 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark', bid
         },
       },
     });
-
-    // Restart the physics simulation to apply new settings
-    // This is necessary because vis-network doesn't automatically
-    // restart physics when options are changed after stabilization
-    network.startSimulation();
   }, [physicsSettings]);
 
   /**
