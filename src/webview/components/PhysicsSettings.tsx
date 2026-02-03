@@ -3,13 +3,13 @@
  * @module webview/components/PhysicsSettings
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { IPhysicsSettings } from '../../shared/types';
 import { postMessage } from '../lib/vscodeApi';
 
 interface PhysicsSettingsProps {
   settings: IPhysicsSettings;
-  onSettingsChange?: (settings: IPhysicsSettings) => void;
+  // onSettingsChange is no longer needed - we only use the round-trip through VSCode
 }
 
 interface SliderConfig {
@@ -64,15 +64,23 @@ const SLIDERS: SliderConfig[] = [
   },
 ];
 
-export default function PhysicsSettings({ settings, onSettingsChange }: PhysicsSettingsProps): React.ReactElement {
+export default function PhysicsSettings({ settings }: PhysicsSettingsProps): React.ReactElement {
   const [isExpanded, setIsExpanded] = useState(false);
+  
+  // Local state for immediate slider feedback
+  // This prevents the double-update issue: we update local state immediately,
+  // and the round-trip through VSCode settings only updates the parent state
+  const [localSettings, setLocalSettings] = useState(settings);
+  
+  // Sync local state when props change (from VSCode settings or reset)
+  useEffect(() => {
+    setLocalSettings(settings);
+  }, [settings]);
 
   const handleSliderChange = (key: keyof IPhysicsSettings, value: number) => {
-    // Update local state for immediate feedback
-    if (onSettingsChange) {
-      onSettingsChange({ ...settings, [key]: value });
-    }
-    // Persist to VSCode settings
+    // Update local state immediately for smooth slider feedback
+    setLocalSettings(prev => ({ ...prev, [key]: value }));
+    // Persist to VSCode settings (round-trip will update parent state)
     postMessage({ type: 'UPDATE_PHYSICS_SETTING', payload: { key, value } });
   };
 
@@ -105,7 +113,7 @@ export default function PhysicsSettings({ settings, onSettingsChange }: PhysicsS
                     {label}
                   </label>
                   <span className="text-xs text-zinc-500 font-mono">
-                    {typeof settings[key] === 'number' ? settings[key].toFixed(step < 1 ? 2 : 0) : settings[key]}
+                    {typeof localSettings[key] === 'number' ? localSettings[key].toFixed(step < 1 ? 2 : 0) : localSettings[key]}
                   </span>
                 </div>
                 <input
@@ -113,7 +121,7 @@ export default function PhysicsSettings({ settings, onSettingsChange }: PhysicsS
                   min={min}
                   max={max}
                   step={step}
-                  value={settings[key]}
+                  value={localSettings[key]}
                   onChange={(e) => handleSliderChange(key, parseFloat(e.target.value))}
                   className="w-full h-1.5 bg-zinc-600 rounded-lg appearance-none cursor-pointer accent-blue-500"
                 />

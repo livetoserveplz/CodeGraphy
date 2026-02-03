@@ -223,10 +223,7 @@ export default function App(): React.ReactElement {
           bidirectionalMode={bidirectionalMode}
           physicsSettings={physicsSettings}
         />
-        <PhysicsSettings 
-          settings={physicsSettings} 
-          onSettingsChange={setPhysicsSettings}
-        />
+        <PhysicsSettings settings={physicsSettings} />
       </div>
     </div>
   );

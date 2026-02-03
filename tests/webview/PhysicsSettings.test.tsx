@@ -3,7 +3,7 @@
  * Tests UI behavior AND VSCode message sending.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import PhysicsSettings from '../../src/webview/components/PhysicsSettings';
 import { IPhysicsSettings } from '../../src/shared/types';
@@ -98,14 +98,8 @@ describe('PhysicsSettings', () => {
   });
 
   describe('slider interactions', () => {
-    it('should call onSettingsChange when slider changes', () => {
-      const onSettingsChange = vi.fn();
-      render(
-        <PhysicsSettings 
-          settings={defaultSettings} 
-          onSettingsChange={onSettingsChange} 
-        />
-      );
+    it('should update local state and send message when slider changes', () => {
+      render(<PhysicsSettings settings={defaultSettings} />);
       
       // Expand
       fireEvent.click(screen.getByTitle('Physics Settings'));
@@ -116,51 +110,39 @@ describe('PhysicsSettings', () => {
       // Change first slider (gravity)
       fireEvent.change(sliders[0], { target: { value: '-100' } });
       
-      // Should call onSettingsChange
-      expect(onSettingsChange).toHaveBeenCalledWith({
-        ...defaultSettings,
-        gravitationalConstant: -100,
-      });
+      // Local state should update (shown in display)
+      expect(screen.getByText('-100')).toBeInTheDocument();
+      
+      // Should send message to VSCode
+      const messages = globalThis.__vscodeSentMessages || [];
+      const updateMsg = messages.find(
+        (m: unknown) => (m as { type?: string }).type === 'UPDATE_PHYSICS_SETTING'
+      );
+      expect(updateMsg).toBeDefined();
     });
 
     it('should update springLength when second slider changes', () => {
-      const onSettingsChange = vi.fn();
-      render(
-        <PhysicsSettings 
-          settings={defaultSettings} 
-          onSettingsChange={onSettingsChange} 
-        />
-      );
+      render(<PhysicsSettings settings={defaultSettings} />);
       
       fireEvent.click(screen.getByTitle('Physics Settings'));
       
       const sliders = screen.getAllByRole('slider');
       fireEvent.change(sliders[1], { target: { value: '200' } });
       
-      expect(onSettingsChange).toHaveBeenCalledWith({
-        ...defaultSettings,
-        springLength: 200,
-      });
+      // Local state should update
+      expect(screen.getByText('200')).toBeInTheDocument();
     });
 
     it('should update springConstant when third slider changes', () => {
-      const onSettingsChange = vi.fn();
-      render(
-        <PhysicsSettings 
-          settings={defaultSettings} 
-          onSettingsChange={onSettingsChange} 
-        />
-      );
+      render(<PhysicsSettings settings={defaultSettings} />);
       
       fireEvent.click(screen.getByTitle('Physics Settings'));
       
       const sliders = screen.getAllByRole('slider');
       fireEvent.change(sliders[2], { target: { value: '0.5' } });
       
-      expect(onSettingsChange).toHaveBeenCalledWith({
-        ...defaultSettings,
-        springConstant: 0.5,
-      });
+      // Local state should update (formatted to 2 decimal places)
+      expect(screen.getByText('0.50')).toBeInTheDocument();
     });
   });
 
