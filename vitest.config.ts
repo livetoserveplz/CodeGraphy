@@ -9,9 +9,11 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['tests/**/*.test.{ts,tsx}'],
     setupFiles: ['./tests/setup.ts'],
+    teardownTimeout: 5000,
     testTimeout: 30000,
     hookTimeout: 10000,
-    teardownTimeout: 5000,
+    // Run tests sequentially to reduce memory pressure
+    fileParallelism: false,
     coverage: {
       reporter: ['text', 'html'],
       include: ['src/**/*.{ts,tsx}'],
