@@ -636,8 +636,13 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
     try {
       // Prompt user for save location
       const defaultFilename = filename || `codegraphy-${Date.now()}.png`;
+      // Use workspace folder as default location, fall back to home directory
+      const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri;
+      const defaultUri = workspaceFolder
+        ? vscode.Uri.joinPath(workspaceFolder, defaultFilename)
+        : vscode.Uri.file(defaultFilename);
       const saveUri = await vscode.window.showSaveDialog({
-        defaultUri: vscode.Uri.file(defaultFilename),
+        defaultUri,
         filters: { 'PNG Images': ['png'] },
         saveLabel: 'Export',
         title: 'Export Graph as PNG',
@@ -675,8 +680,13 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
   private async _saveExportedSvg(svgContent: string, filename?: string): Promise<void> {
     try {
       const defaultFilename = filename || `codegraphy-${Date.now()}.svg`;
+      // Use workspace folder as default location, fall back to home directory
+      const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri;
+      const defaultUri = workspaceFolder
+        ? vscode.Uri.joinPath(workspaceFolder, defaultFilename)
+        : vscode.Uri.file(defaultFilename);
       const saveUri = await vscode.window.showSaveDialog({
-        defaultUri: vscode.Uri.file(defaultFilename),
+        defaultUri,
         filters: { 'SVG Images': ['svg'] },
         saveLabel: 'Export',
         title: 'Export Graph as SVG',
@@ -709,8 +719,13 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
   private async _saveExportedJson(jsonContent: string, filename?: string): Promise<void> {
     try {
       const defaultFilename = filename || `codegraphy-${Date.now()}.json`;
+      // Use workspace folder as default location, fall back to home directory
+      const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri;
+      const defaultUri = workspaceFolder
+        ? vscode.Uri.joinPath(workspaceFolder, defaultFilename)
+        : vscode.Uri.file(defaultFilename);
       const saveUri = await vscode.window.showSaveDialog({
-        defaultUri: vscode.Uri.file(defaultFilename),
+        defaultUri,
         filters: { 'JSON Files': ['json'] },
         saveLabel: 'Export',
         title: 'Export Graph Layout as JSON',
