@@ -204,7 +204,7 @@
     "watch:extension": "esbuild src/extension/index.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --watch",
     "watch:webview": "vite build --watch",
     "dev": "npm run watch",
-    "test": "vitest run",
+    "test": "vitest run --reporter=basic --pool=threads --poolOptions.threads.singleThread=true",
     "test:watch": "vitest",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
