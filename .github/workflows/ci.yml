@@ -86,7 +86,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libasound2 libgbm1 libgtk-3-0 libnss3 xvfb
+          sudo apt-get install -y libgbm1 libgtk-3-0 libnss3 xvfb
       
       - name: Build extension
         run: npm run build
