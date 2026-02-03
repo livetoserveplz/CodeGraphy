@@ -274,6 +274,20 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
+   * Request the webview to export as SVG.
+   */
+  public requestExportSvg(): void {
+    this._sendMessage({ type: 'REQUEST_EXPORT_SVG' });
+  }
+
+  /**
+   * Request the webview to export layout as JSON.
+   */
+  public requestExportJson(): void {
+    this._sendMessage({ type: 'REQUEST_EXPORT_JSON' });
+  }
+
+  /**
    * Sends a message to the webview.
    * 
    * @param message - Message to send to the webview
@@ -412,6 +426,14 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
           await this._saveExportedPng(message.payload.dataUrl, message.payload.filename);
           break;
           
+        case 'EXPORT_SVG':
+          await this._saveExportedSvg(message.payload.svg, message.payload.filename);
+          break;
+          
+        case 'EXPORT_JSON':
+          await this._saveExportedJson(message.payload.json, message.payload.filename);
+          break;
+
         case 'UNDO': {
           const undoDesc = await this.undo();
           if (undoDesc) {
@@ -644,6 +666,74 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
       }
     } catch (error) {
       vscode.window.showErrorMessage(`Failed to export PNG: ${error}`);
+    }
+  }
+
+  /**
+   * Save exported SVG to file.
+   */
+  private async _saveExportedSvg(svgContent: string, filename?: string): Promise<void> {
+    try {
+      const defaultFilename = filename || `codegraphy-${Date.now()}.svg`;
+      const saveUri = await vscode.window.showSaveDialog({
+        defaultUri: vscode.Uri.file(defaultFilename),
+        filters: { 'SVG Images': ['svg'] },
+        saveLabel: 'Export',
+        title: 'Export Graph as SVG',
+      });
+
+      if (!saveUri) return;
+
+      const buffer = Buffer.from(svgContent, 'utf-8');
+      await vscode.workspace.fs.writeFile(saveUri, buffer);
+
+      const action = await vscode.window.showInformationMessage(
+        `Graph exported to ${saveUri.fsPath}`,
+        'Open File',
+        'Open Folder'
+      );
+
+      if (action === 'Open File') {
+        await vscode.commands.executeCommand('vscode.open', saveUri);
+      } else if (action === 'Open Folder') {
+        await vscode.commands.executeCommand('revealFileInOS', saveUri);
+      }
+    } catch (error) {
+      vscode.window.showErrorMessage(`Failed to export SVG: ${error}`);
+    }
+  }
+
+  /**
+   * Save exported JSON layout to file.
+   */
+  private async _saveExportedJson(jsonContent: string, filename?: string): Promise<void> {
+    try {
+      const defaultFilename = filename || `codegraphy-${Date.now()}.json`;
+      const saveUri = await vscode.window.showSaveDialog({
+        defaultUri: vscode.Uri.file(defaultFilename),
+        filters: { 'JSON Files': ['json'] },
+        saveLabel: 'Export',
+        title: 'Export Graph Layout as JSON',
+      });
+
+      if (!saveUri) return;
+
+      const buffer = Buffer.from(jsonContent, 'utf-8');
+      await vscode.workspace.fs.writeFile(saveUri, buffer);
+
+      const action = await vscode.window.showInformationMessage(
+        `Graph layout exported to ${saveUri.fsPath}`,
+        'Open File',
+        'Open Folder'
+      );
+
+      if (action === 'Open File') {
+        await vscode.commands.executeCommand('vscode.open', saveUri);
+      } else if (action === 'Open Folder') {
+        await vscode.commands.executeCommand('revealFileInOS', saveUri);
+      }
+    } catch (error) {
+      vscode.window.showErrorMessage(`Failed to export JSON: ${error}`);
     }
   }
 
