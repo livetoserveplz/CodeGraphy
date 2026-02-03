@@ -2,6 +2,8 @@
 
 This directory contains Playwright-based visual regression tests for the CodeGraphy webview.
 
+> **Note:** These tests run **locally only** for now. CI runs are disabled until cross-platform baselines are generated.
+
 ## Overview
 
 Visual regression tests capture screenshots of the graph at various states and compare them against baseline images. This catches rendering bugs, layout shifts, and unexpected visual changes.

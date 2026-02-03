@@ -2,6 +2,8 @@
 
 End-to-end tests that run inside a real VS Code instance using [@vscode/test-electron](https://github.com/microsoft/vscode-test).
 
+> **Note:** These tests run **locally only** for now. CI runs are disabled until xvfb/DBus issues are resolved.
+
 ## Overview
 
 These tests verify:
