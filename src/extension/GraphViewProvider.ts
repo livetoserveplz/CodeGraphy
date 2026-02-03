@@ -8,6 +8,7 @@
 import * as vscode from 'vscode';
 import {
   IGraphData,
+  BidirectionalEdgeMode,
   ExtensionToWebviewMessage,
   WebviewToExtensionMessage,
 } from '../shared/types';
@@ -170,6 +171,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
    */
   public async refresh(): Promise<void> {
     await this._analyzeAndSendData();
+    this._sendSettings();
   }
 
   /**
@@ -349,6 +351,8 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
           this._analyzeAndSendData();
           // Send current favorites
           this._sendFavorites();
+          // Send current settings
+          this._sendSettings();
           break;
 
         case 'NODE_SELECTED':
@@ -638,6 +642,15 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
     const config = vscode.workspace.getConfiguration('codegraphy');
     const favorites = config.get<string[]>('favorites', []);
     this._sendMessage({ type: 'FAVORITES_UPDATED', payload: { favorites } });
+  }
+
+  /**
+   * Sends current settings to the webview.
+   */
+  private _sendSettings(): void {
+    const config = vscode.workspace.getConfiguration('codegraphy');
+    const bidirectionalEdges = config.get<BidirectionalEdgeMode>('bidirectionalEdges', 'separate');
+    this._sendMessage({ type: 'SETTINGS_UPDATED', payload: { bidirectionalEdges } });
   }
 
   /**
