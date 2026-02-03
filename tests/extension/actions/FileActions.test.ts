@@ -7,6 +7,8 @@ import * as vscode from 'vscode';
 import { DeleteFilesAction } from '../../../src/extension/actions/DeleteFilesAction';
 import { RenameFileAction } from '../../../src/extension/actions/RenameFileAction';
 import { CreateFileAction } from '../../../src/extension/actions/CreateFileAction';
+import { ToggleFavoriteAction } from '../../../src/extension/actions/ToggleFavoriteAction';
+import { getUndoManager, resetUndoManager } from '../../../src/extension/UndoManager';
 
 // Mock vscode module
 vi.mock('vscode', () => ({
@@ -318,5 +320,147 @@ describe('CreateFileAction', () => {
 
     expect(vscode.workspace.fs.delete).toHaveBeenCalledTimes(1);
     expect(mockRefreshGraph).toHaveBeenCalledTimes(2);
+  });
+});
+
+/**
+ * Integration tests for chained undo operations.
+ * These test the scenario: favorite → rename → undo → undo
+ * Verifies that state-based undo correctly restores favorites.
+ */
+describe('Chained Undo Operations', () => {
+  const mockWorkspaceFolder = { fsPath: '/workspace' } as vscode.Uri;
+  let mockRefreshGraph: ReturnType<typeof vi.fn>;
+  let mockSendFavorites: ReturnType<typeof vi.fn>;
+  let currentFavorites: string[];
+  let mockConfigUpdate: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetUndoManager();
+    currentFavorites = [];
+    mockRefreshGraph = vi.fn().mockResolvedValue(undefined);
+    mockSendFavorites = vi.fn();
+    mockConfigUpdate = vi.fn().mockImplementation((_key, value) => {
+      currentFavorites = value;
+      return Promise.resolve();
+    });
+
+    (vscode.workspace.getConfiguration as ReturnType<typeof vi.fn>).mockReturnValue({
+      get: vi.fn().mockImplementation((key: string) => {
+        if (key === 'favorites') return [...currentFavorites];
+        return [];
+      }),
+      update: mockConfigUpdate,
+    });
+
+    (vscode.workspace.fs.rename as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+    resetUndoManager();
+  });
+
+  it('should correctly undo chained operations: favorite → rename → undo rename → undo favorite', async () => {
+    const undoManager = getUndoManager();
+    
+    // Step 1: Add file to favorites
+    const toggleAction = new ToggleFavoriteAction(['src/app.ts'], mockSendFavorites);
+    await undoManager.execute(toggleAction);
+    
+    expect(currentFavorites).toEqual(['src/app.ts']);
+    
+    // Step 2: Rename the favorited file
+    const renameAction = new RenameFileAction(
+      'src/app.ts',
+      'src/main.ts',
+      mockWorkspaceFolder,
+      mockRefreshGraph
+    );
+    await undoManager.execute(renameAction);
+    
+    // Favorites should now have the new path
+    expect(currentFavorites).toEqual(['src/main.ts']);
+    
+    // Step 3: Undo the rename
+    const undoRenameDesc = await undoManager.undo();
+    expect(undoRenameDesc).toBe('Rename: app.ts → main.ts');
+    
+    // Favorites should be restored to original path
+    expect(currentFavorites).toEqual(['src/app.ts']);
+    
+    // Step 4: Undo the favorite toggle
+    const undoFavDesc = await undoManager.undo();
+    expect(undoFavDesc).toBe('Toggle favorite: app.ts');
+    
+    // Favorites should be empty again
+    expect(currentFavorites).toEqual([]);
+  });
+
+  it('should handle redo after chained undo', async () => {
+    const undoManager = getUndoManager();
+    
+    // Setup: favorite → rename
+    const toggleAction = new ToggleFavoriteAction(['src/app.ts'], mockSendFavorites);
+    await undoManager.execute(toggleAction);
+    
+    const renameAction = new RenameFileAction(
+      'src/app.ts',
+      'src/main.ts',
+      mockWorkspaceFolder,
+      mockRefreshGraph
+    );
+    await undoManager.execute(renameAction);
+    
+    // Undo both
+    await undoManager.undo(); // undo rename
+    await undoManager.undo(); // undo favorite
+    
+    expect(currentFavorites).toEqual([]);
+    
+    // Redo favorite
+    await undoManager.redo();
+    expect(currentFavorites).toEqual(['src/app.ts']);
+    
+    // Redo rename
+    await undoManager.redo();
+    expect(currentFavorites).toEqual(['src/main.ts']);
+  });
+
+  it('should maintain state consistency when interleaved with other operations', async () => {
+    const undoManager = getUndoManager();
+    
+    // File A: toggle favorite
+    const toggleA = new ToggleFavoriteAction(['src/a.ts'], mockSendFavorites);
+    await undoManager.execute(toggleA);
+    expect(currentFavorites).toEqual(['src/a.ts']);
+    
+    // File B: toggle favorite (both A and B now favorited)
+    const toggleB = new ToggleFavoriteAction(['src/b.ts'], mockSendFavorites);
+    await undoManager.execute(toggleB);
+    expect(currentFavorites).toEqual(['src/a.ts', 'src/b.ts']);
+    
+    // Rename A
+    const renameA = new RenameFileAction(
+      'src/a.ts',
+      'src/a-renamed.ts',
+      mockWorkspaceFolder,
+      mockRefreshGraph
+    );
+    await undoManager.execute(renameA);
+    expect(currentFavorites).toEqual(['src/a-renamed.ts', 'src/b.ts']);
+    
+    // Undo rename A
+    await undoManager.undo();
+    expect(currentFavorites).toEqual(['src/a.ts', 'src/b.ts']);
+    
+    // Undo toggle B
+    await undoManager.undo();
+    expect(currentFavorites).toEqual(['src/a.ts']);
+    
+    // Undo toggle A
+    await undoManager.undo();
+    expect(currentFavorites).toEqual([]);
   });
 });
