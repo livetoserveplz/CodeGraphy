@@ -16,13 +16,18 @@ interface StoredFile {
 
 /**
  * Action for deleting files with undo support.
- * Stores file contents before deletion so they can be restored.
+ * Stores file contents and favorites state before deletion so they can be restored.
+ * Uses state-based undo for favorites to handle external modifications gracefully.
  */
 export class DeleteFilesAction implements IUndoableAction {
   readonly description: string;
 
   /** Stored file contents for restoration */
   private _storedFiles: StoredFile[] = [];
+  /** Full favorites state BEFORE this action was executed */
+  private _favoritesBefore: string[] = [];
+  /** Full favorites state AFTER this action was executed */
+  private _favoritesAfter: string[] = [];
 
   /**
    * Creates a new DeleteFilesAction.
@@ -45,6 +50,14 @@ export class DeleteFilesAction implements IUndoableAction {
     // Store file contents before deletion
     this._storedFiles = [];
 
+    // Store favorites state before deletion
+    const config = vscode.workspace.getConfiguration('codegraphy');
+    this._favoritesBefore = [...config.get<string[]>('favorites', [])];
+    
+    // Calculate new favorites (remove deleted files)
+    const deletedPaths = new Set(this._paths);
+    this._favoritesAfter = this._favoritesBefore.filter(f => !deletedPaths.has(f));
+
     for (const filePath of this._paths) {
       const fileUri = vscode.Uri.joinPath(this._workspaceFolder, filePath);
       try {
@@ -57,6 +70,9 @@ export class DeleteFilesAction implements IUndoableAction {
         // Continue with other files
       }
     }
+
+    // Update favorites (remove deleted files from favorites)
+    await config.update('favorites', this._favoritesAfter, vscode.ConfigurationTarget.Workspace);
 
     await this._refreshGraph();
   }
@@ -72,6 +88,10 @@ export class DeleteFilesAction implements IUndoableAction {
         vscode.window.showErrorMessage(`Failed to restore ${storedFile.path}`);
       }
     }
+
+    // Restore favorites state (full replacement)
+    const config = vscode.workspace.getConfiguration('codegraphy');
+    await config.update('favorites', this._favoritesBefore, vscode.ConfigurationTarget.Workspace);
 
     await this._refreshGraph();
   }

@@ -9,13 +9,17 @@ import { IUndoableAction } from '../UndoManager';
 /**
  * Action for renaming a file with undo support.
  * Tracks old and new paths to reverse the rename.
- * Also updates favorites list to track the file through renames.
+ * Uses state-based undo for favorites to handle external modifications gracefully.
  */
 export class RenameFileAction implements IUndoableAction {
   readonly description: string;
 
-  /** Whether the old path was in favorites before rename */
-  private _wasInFavorites = false;
+  /** Full favorites state BEFORE this action was executed */
+  private _favoritesBefore: string[] = [];
+  /** Full favorites state AFTER this action was executed */
+  private _favoritesAfter: string[] = [];
+  /** Whether this action has been executed at least once */
+  private _hasExecuted = false;
 
   /**
    * Creates a new RenameFileAction.
@@ -39,18 +43,27 @@ export class RenameFileAction implements IUndoableAction {
     const oldUri = vscode.Uri.joinPath(this._workspaceFolder, this._oldPath);
     const newUri = vscode.Uri.joinPath(this._workspaceFolder, this._newPath);
 
-    // Check if file was in favorites before rename
     const config = vscode.workspace.getConfiguration('codegraphy');
-    const favorites = config.get<string[]>('favorites', []);
-    this._wasInFavorites = favorites.includes(this._oldPath);
+    const currentFavorites = config.get<string[]>('favorites', []);
+    
+    // Only capture "before" state on first execution
+    if (!this._hasExecuted) {
+      this._favoritesBefore = [...currentFavorites];
+      
+      // Calculate new favorites state (update path if file was favorited)
+      this._favoritesAfter = currentFavorites.map(f => 
+        f === this._oldPath ? this._newPath : f
+      );
+      this._hasExecuted = true;
+    }
 
     // Rename the file
     await vscode.workspace.fs.rename(oldUri, newUri);
 
-    // Update favorites to track the file through the rename
-    if (this._wasInFavorites) {
-      const updatedFavorites = favorites.map(f => f === this._oldPath ? this._newPath : f);
-      await config.update('favorites', updatedFavorites, vscode.ConfigurationTarget.Workspace);
+    // Only update favorites if the file was in favorites (state actually changed)
+    const favoritesChanged = this._favoritesBefore.includes(this._oldPath);
+    if (favoritesChanged) {
+      await config.update('favorites', this._favoritesAfter, vscode.ConfigurationTarget.Workspace);
     }
 
     await this._refreshGraph();
@@ -63,12 +76,11 @@ export class RenameFileAction implements IUndoableAction {
 
     await vscode.workspace.fs.rename(newUri, oldUri);
 
-    // Restore favorites to use old path
-    if (this._wasInFavorites) {
+    // Only restore favorites if the file was originally in favorites
+    const favoritesChanged = this._favoritesBefore.includes(this._oldPath);
+    if (favoritesChanged) {
       const config = vscode.workspace.getConfiguration('codegraphy');
-      const favorites = config.get<string[]>('favorites', []);
-      const restoredFavorites = favorites.map(f => f === this._newPath ? this._oldPath : f);
-      await config.update('favorites', restoredFavorites, vscode.ConfigurationTarget.Workspace);
+      await config.update('favorites', this._favoritesBefore, vscode.ConfigurationTarget.Workspace);
     }
 
     await this._refreshGraph();

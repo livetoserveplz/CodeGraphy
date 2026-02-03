@@ -8,13 +8,18 @@ import { IUndoableAction } from '../UndoManager';
 
 /**
  * Action for adding patterns to the exclude list.
- * Stores the patterns that were actually new so they can be removed on undo.
+ * Uses state-based undo (stores full state before/after) for robustness
+ * against external modifications.
  */
 export class AddToExcludeAction implements IUndoableAction {
   readonly description: string;
   
-  /** Patterns that were actually added (not already in list) */
-  private _addedPatterns: string[] = [];
+  /** Full exclude state BEFORE this action was executed */
+  private _stateBefore: string[] = [];
+  /** Full exclude state AFTER this action was executed */
+  private _stateAfter: string[] = [];
+  /** Whether this action has been executed at least once */
+  private _hasExecuted = false;
 
   /**
    * Creates a new AddToExcludeAction.
@@ -32,32 +37,32 @@ export class AddToExcludeAction implements IUndoableAction {
 
   async execute(): Promise<void> {
     const config = vscode.workspace.getConfiguration('codegraphy');
-    const currentExclude = new Set<string>(config.get<string[]>('exclude', []));
-
-    // Convert file paths to glob patterns and track which are new
-    this._addedPatterns = [];
-    for (const path of this._paths) {
-      const pattern = `**/${path}`;
-      if (!currentExclude.has(pattern)) {
-        currentExclude.add(pattern);
-        this._addedPatterns.push(pattern);
+    const currentExclude = config.get<string[]>('exclude', []);
+    
+    // Only capture "before" state on first execution
+    if (!this._hasExecuted) {
+      this._stateBefore = [...currentExclude];
+      
+      // Calculate new state by adding patterns
+      const excludeSet = new Set<string>(currentExclude);
+      for (const path of this._paths) {
+        const pattern = `**/${path}`;
+        excludeSet.add(pattern);
       }
+      this._stateAfter = Array.from(excludeSet);
+      this._hasExecuted = true;
     }
 
-    await config.update('exclude', Array.from(currentExclude), vscode.ConfigurationTarget.Workspace);
+    // Apply the "after" state
+    await config.update('exclude', this._stateAfter, vscode.ConfigurationTarget.Workspace);
     await this._refreshGraph();
   }
 
   async undo(): Promise<void> {
     const config = vscode.workspace.getConfiguration('codegraphy');
-    const currentExclude = new Set<string>(config.get<string[]>('exclude', []));
-
-    // Remove only the patterns we added
-    for (const pattern of this._addedPatterns) {
-      currentExclude.delete(pattern);
-    }
-
-    await config.update('exclude', Array.from(currentExclude), vscode.ConfigurationTarget.Workspace);
+    
+    // Restore to the "before" state (full replacement)
+    await config.update('exclude', this._stateBefore, vscode.ConfigurationTarget.Workspace);
     await this._refreshGraph();
   }
 }

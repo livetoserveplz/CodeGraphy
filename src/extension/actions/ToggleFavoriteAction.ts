@@ -8,15 +8,18 @@ import { IUndoableAction } from '../UndoManager';
 
 /**
  * Action for toggling favorite status of files.
- * Captures the state before the toggle so it can be reversed.
+ * Uses state-based undo (stores full state before/after) for robustness
+ * against external modifications (e.g., VSCode native undo of renames).
  */
 export class ToggleFavoriteAction implements IUndoableAction {
   readonly description: string;
   
-  /** Paths that were added to favorites (need to remove on undo) */
-  private _added: string[] = [];
-  /** Paths that were removed from favorites (need to re-add on undo) */
-  private _removed: string[] = [];
+  /** Full favorites state BEFORE this action was executed */
+  private _stateBefore: string[] = [];
+  /** Full favorites state AFTER this action was executed */
+  private _stateAfter: string[] = [];
+  /** Whether this action has been executed at least once */
+  private _hasExecuted = false;
 
   /**
    * Creates a new ToggleFavoriteAction.
@@ -34,39 +37,36 @@ export class ToggleFavoriteAction implements IUndoableAction {
 
   async execute(): Promise<void> {
     const config = vscode.workspace.getConfiguration('codegraphy');
-    const favorites = new Set<string>(config.get<string[]>('favorites', []));
-
-    // Track what we're adding vs removing
-    this._added = [];
-    this._removed = [];
-
-    for (const path of this._paths) {
-      if (favorites.has(path)) {
-        favorites.delete(path);
-        this._removed.push(path);
-      } else {
-        favorites.add(path);
-        this._added.push(path);
+    const currentFavorites = config.get<string[]>('favorites', []);
+    
+    // Only capture "before" state on first execution
+    // On redo, we restore to the same "after" state
+    if (!this._hasExecuted) {
+      this._stateBefore = [...currentFavorites];
+      
+      // Calculate new state by toggling the paths
+      const favSet = new Set<string>(currentFavorites);
+      for (const path of this._paths) {
+        if (favSet.has(path)) {
+          favSet.delete(path);
+        } else {
+          favSet.add(path);
+        }
       }
+      this._stateAfter = Array.from(favSet);
+      this._hasExecuted = true;
     }
 
-    await config.update('favorites', Array.from(favorites), vscode.ConfigurationTarget.Workspace);
+    // Apply the "after" state
+    await config.update('favorites', this._stateAfter, vscode.ConfigurationTarget.Workspace);
     this._sendFavorites();
   }
 
   async undo(): Promise<void> {
     const config = vscode.workspace.getConfiguration('codegraphy');
-    const favorites = new Set<string>(config.get<string[]>('favorites', []));
-
-    // Reverse the changes
-    for (const path of this._added) {
-      favorites.delete(path);
-    }
-    for (const path of this._removed) {
-      favorites.add(path);
-    }
-
-    await config.update('favorites', Array.from(favorites), vscode.ConfigurationTarget.Workspace);
+    
+    // Restore to the "before" state (full replacement, not delta)
+    await config.update('favorites', this._stateBefore, vscode.ConfigurationTarget.Workspace);
     this._sendFavorites();
   }
 }
