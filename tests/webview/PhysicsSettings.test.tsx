@@ -98,12 +98,12 @@ describe('PhysicsSettings', () => {
   });
 
   describe('slider interactions', () => {
-    it('should call onSettingsChange when slider changes', () => {
+    it('should call onSettingsChange and send message when slider changes', () => {
       const onSettingsChange = vi.fn();
       render(
         <PhysicsSettings 
           settings={defaultSettings} 
-          onSettingsChange={onSettingsChange} 
+          onSettingsChange={onSettingsChange}
         />
       );
       
@@ -116,11 +116,18 @@ describe('PhysicsSettings', () => {
       // Change first slider (gravity)
       fireEvent.change(sliders[0], { target: { value: '-100' } });
       
-      // Should call onSettingsChange
+      // Should call onSettingsChange with new value
       expect(onSettingsChange).toHaveBeenCalledWith({
         ...defaultSettings,
         gravitationalConstant: -100,
       });
+      
+      // Should send message to VSCode
+      const messages = globalThis.__vscodeSentMessages || [];
+      const updateMsg = messages.find(
+        (m: unknown) => (m as { type?: string }).type === 'UPDATE_PHYSICS_SETTING'
+      );
+      expect(updateMsg).toBeDefined();
     });
 
     it('should update springLength when second slider changes', () => {
@@ -128,7 +135,7 @@ describe('PhysicsSettings', () => {
       render(
         <PhysicsSettings 
           settings={defaultSettings} 
-          onSettingsChange={onSettingsChange} 
+          onSettingsChange={onSettingsChange}
         />
       );
       
@@ -148,7 +155,7 @@ describe('PhysicsSettings', () => {
       render(
         <PhysicsSettings 
           settings={defaultSettings} 
-          onSettingsChange={onSettingsChange} 
+          onSettingsChange={onSettingsChange}
         />
       );
       

@@ -68,11 +68,12 @@ export default function PhysicsSettings({ settings, onSettingsChange }: PhysicsS
   const [isExpanded, setIsExpanded] = useState(false);
 
   const handleSliderChange = (key: keyof IPhysicsSettings, value: number) => {
-    // Update local state for immediate feedback
+    const newSettings = { ...settings, [key]: value };
+    // Update parent state immediately for live graph updates
     if (onSettingsChange) {
-      onSettingsChange({ ...settings, [key]: value });
+      onSettingsChange(newSettings);
     }
-    // Persist to VSCode settings
+    // Persist to VSCode settings for saving
     postMessage({ type: 'UPDATE_PHYSICS_SETTING', payload: { key, value } });
   };
 
