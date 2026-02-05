@@ -15,6 +15,28 @@
  */
 export type NodeSizeMode = 'connections' | 'file-size' | 'access-count' | 'uniform';
 
+/**
+ * Layout algorithm for the graph.
+ * Determines how nodes are arranged in the visualization.
+ */
+export type LayoutAlgorithm = 'forceAtlas2Based' | 'barnesHut' | 'hierarchical' | 'manual';
+
+/**
+ * Direction for hierarchical layout.
+ * UD = Up-Down, DU = Down-Up, LR = Left-Right, RL = Right-Left
+ */
+export type HierarchicalDirection = 'UD' | 'DU' | 'LR' | 'RL';
+
+/**
+ * Layout settings for the graph.
+ */
+export interface ILayoutSettings {
+  /** The layout algorithm to use */
+  algorithm: LayoutAlgorithm;
+  /** Direction for hierarchical layout */
+  hierarchicalDirection: HierarchicalDirection;
+}
+
 // ============================================================================
 // File Data (internal representation, what plugins will produce)
 // ============================================================================
@@ -269,6 +291,7 @@ export type ExtensionToWebviewMessage =
   | { type: 'NODE_ACCESS_COUNT_UPDATED'; payload: { nodeId: string; accessCount: number } }
   | { type: 'VIEWS_UPDATED'; payload: { views: IAvailableView[]; activeViewId: string } }
   | { type: 'PHYSICS_SETTINGS_UPDATED'; payload: IPhysicsSettings }
+  | { type: 'LAYOUT_SETTINGS_UPDATED'; payload: ILayoutSettings }
   | { type: 'DEPTH_LIMIT_UPDATED'; payload: { depthLimit: number } };
 
 /**
@@ -313,6 +336,8 @@ export type WebviewToExtensionMessage =
   | { type: 'UPDATE_PHYSICS_SETTING'; payload: { key: keyof IPhysicsSettings; value: number } }
   | { type: 'RESET_PHYSICS_SETTINGS' }
   | { type: 'GET_PHYSICS_SETTINGS' }
+  | { type: 'UPDATE_LAYOUT_SETTING'; payload: { key: keyof ILayoutSettings; value: string } }
+  | { type: 'GET_LAYOUT_SETTINGS' }
   // Undo/Redo commands from webview keyboard shortcuts
   | { type: 'UNDO' }
   | { type: 'REDO' }

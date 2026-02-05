@@ -5,7 +5,7 @@
  */
 
 import * as vscode from 'vscode';
-import { NodeSizeMode } from '../shared/types';
+import type { NodeSizeMode, LayoutAlgorithm, HierarchicalDirection } from '../shared/types';
 
 /**
  * Default exclude patterns for file discovery.
@@ -150,6 +150,22 @@ export class Configuration {
    */
   get nodeSizeBy(): NodeSizeMode {
     return this.config.get<NodeSizeMode>('nodeSizeBy', 'connections');
+  }
+
+  /**
+   * Layout algorithm for the graph.
+   * @default 'forceAtlas2Based'
+   */
+  get layoutAlgorithm(): LayoutAlgorithm {
+    return this.config.get<LayoutAlgorithm>('layout.algorithm', 'forceAtlas2Based');
+  }
+
+  /**
+   * Direction for hierarchical layout.
+   * @default 'UD'
+   */
+  get layoutHierarchicalDirection(): HierarchicalDirection {
+    return this.config.get<HierarchicalDirection>('layout.hierarchical.direction', 'UD');
   }
 
   /**
