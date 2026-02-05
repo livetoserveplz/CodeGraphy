@@ -10,7 +10,7 @@ import * as fs from 'fs';
 export async function run(): Promise<void> {
   // Create the mocha test
   const mocha = new Mocha({
-    ui: 'bdd',
+    ui: 'tdd',
     color: true,
     timeout: 60000, // 60s timeout for extension tests
   });
