@@ -2,8 +2,7 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import Graph from './components/Graph';
 import GraphIcon from './components/GraphIcon';
 import { SearchBar, SearchOptions } from './components/SearchBar';
-import { ViewSwitcher } from './components/ViewSwitcher';
-import PhysicsSettings from './components/PhysicsSettings';
+import { GearPopup } from './components/GearPopup';
 import { DepthSlider } from './components/DepthSlider';
 import { useTheme } from './hooks/useTheme';
 import { IGraphData, IGraphNode, IAvailableView, BidirectionalEdgeMode, IPhysicsSettings, ExtensionToWebviewMessage } from '../shared/types';
@@ -187,10 +186,10 @@ export default function App(): React.ReactElement {
     );
   }
 
-  // Graph view with search bar and view switcher
+  // Graph view with search bar
   return (
     <div className="relative w-full h-screen flex flex-col">
-      {/* Header with search bar and view switcher */}
+      {/* Header with search bar */}
       <div className="flex-shrink-0 p-2 border-b border-[var(--vscode-panel-border,#3c3c3c)] flex items-center gap-2">
         <div className="flex-1">
           <SearchBar
@@ -204,14 +203,9 @@ export default function App(): React.ReactElement {
             regexError={regexError}
           />
         </div>
-{activeViewId === 'codegraphy.depth-graph' && (
+        {activeViewId === 'codegraphy.depth-graph' && (
           <DepthSlider depthLimit={depthLimit} />
         )}
-        <ViewSwitcher
-          views={availableViews}
-          activeViewId={activeViewId}
-          onViewChange={setActiveViewId}
-        />
       </div>
       
       {/* Graph */}
@@ -223,9 +217,12 @@ export default function App(): React.ReactElement {
           bidirectionalMode={bidirectionalMode}
           physicsSettings={physicsSettings}
         />
-        <PhysicsSettings 
-          settings={physicsSettings} 
-          onSettingsChange={setPhysicsSettings}
+        <GearPopup
+          physicsSettings={physicsSettings}
+          onPhysicsChange={setPhysicsSettings}
+          views={availableViews}
+          activeViewId={activeViewId}
+          onViewChange={setActiveViewId}
         />
       </div>
     </div>
