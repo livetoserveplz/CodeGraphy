@@ -88,6 +88,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgbm1 libgtk-3-0 libnss3 xvfb
       
+      - name: Install Playwright browsers
+        run: npx playwright install chromium
+      
       - name: Build extension
         run: npm run build
       
