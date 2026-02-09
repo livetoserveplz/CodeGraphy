@@ -154,6 +154,32 @@ describe('Configuration', () => {
     });
   });
 
+  describe('layoutAlgorithm', () => {
+    it('should return default forceAtlas2Based', () => {
+      const config = new Configuration();
+      expect(config.layoutAlgorithm).toBe('forceAtlas2Based');
+    });
+
+    it('should return configured value', () => {
+      mockConfig['layout.algorithm'] = 'hierarchical';
+      const config = new Configuration();
+      expect(config.layoutAlgorithm).toBe('hierarchical');
+    });
+  });
+
+  describe('hierarchicalDirection', () => {
+    it('should return default UD', () => {
+      const config = new Configuration();
+      expect(config.hierarchicalDirection).toBe('UD');
+    });
+
+    it('should return configured value', () => {
+      mockConfig['layout.hierarchical.direction'] = 'LR';
+      const config = new Configuration();
+      expect(config.hierarchicalDirection).toBe('LR');
+    });
+  });
+
   describe('DEFAULT_EXCLUDE_PATTERNS', () => {
     it('should include node_modules', () => {
       expect(DEFAULT_EXCLUDE_PATTERNS).toContain('**/node_modules/**');

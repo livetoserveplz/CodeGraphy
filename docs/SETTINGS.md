@@ -16,6 +16,8 @@ CodeGraphy provides several settings to customize its behavior. Configure these 
 | `codegraphy.nodeSizeBy` | string | `"connections"` | What determines node size (`connections`, `file-size`, `access-count`, `uniform`) |
 | `codegraphy.plugins` | string[] | `[]` | Paths to external plugins |
 | `codegraphy.fileColors` | object | `{}` | Custom colors for file extensions |
+| `codegraphy.layout.algorithm` | string | `"forceAtlas2Based"` | Graph layout algorithm |
+| `codegraphy.layout.hierarchical.direction` | string | `"UD"` | Direction for hierarchical layout |
 | `codegraphy.physics.gravitationalConstant` | number | `-50` | Gravity strength (more negative = stronger pull) |
 | `codegraphy.physics.springLength` | number | `100` | Preferred distance between connected nodes |
 | `codegraphy.physics.springConstant` | number | `0.08` | Spring stiffness (connection strength) |
@@ -231,6 +233,41 @@ Paths to external plugin files (for future use).
 ```
 
 Currently, only built-in plugins are supported. External plugin loading is planned for a future release.
+
+### Layout Settings
+
+Control the graph layout algorithm.
+
+```json
+{
+  "codegraphy.layout.algorithm": "forceAtlas2Based",
+  "codegraphy.layout.hierarchical.direction": "UD"
+}
+```
+
+**Available algorithms:**
+
+| Algorithm | Description |
+|-----------|-------------|
+| `forceAtlas2Based` | Force Atlas 2 - good clustering (default) |
+| `barnesHut` | Barnes Hut - efficient for large graphs |
+| `repulsion` | Simple repulsion model |
+| `hierarchical` | Shows import hierarchy as a tree |
+
+**Hierarchical directions:**
+
+| Direction | Description |
+|-----------|-------------|
+| `UD` | Up to Down (default) |
+| `DU` | Down to Up |
+| `LR` | Left to Right |
+| `RL` | Right to Left |
+
+**Tips:**
+- Use `forceAtlas2Based` (default) for general-purpose visualization
+- Use `barnesHut` for large graphs (100+ nodes) for better performance
+- Use `hierarchical` to visualize the import dependency tree
+- The hierarchical direction setting only applies when algorithm is `hierarchical`
 
 ### Physics Settings
 

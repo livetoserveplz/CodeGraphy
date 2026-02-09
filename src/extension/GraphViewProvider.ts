@@ -11,6 +11,7 @@ import {
   IAvailableView,
   BidirectionalEdgeMode,
   IPhysicsSettings,
+  ILayoutSettings,
   ExtensionToWebviewMessage,
   WebviewToExtensionMessage,
 } from '../shared/types';
@@ -228,6 +229,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
     await this._analyzeAndSendData();
     this._sendSettings();
     this._sendPhysicsSettings();
+    this._sendLayoutSettings();
   }
 
   /**
@@ -236,6 +238,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
    */
   public refreshPhysicsSettings(): void {
     this._sendPhysicsSettings();
+    this._sendLayoutSettings();
   }
 
   /**
@@ -640,6 +643,8 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
           this._sendSettings();
           // Send physics settings
           this._sendPhysicsSettings();
+          // Send layout settings
+          this._sendLayoutSettings();
           break;
 
         case 'NODE_SELECTED':
@@ -1188,6 +1193,25 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
   private _sendPhysicsSettings(): void {
     const settings = this._getPhysicsSettings();
     this._sendMessage({ type: 'PHYSICS_SETTINGS_UPDATED', payload: settings });
+  }
+
+  /**
+   * Gets the current layout settings from configuration.
+   */
+  private _getLayoutSettings(): ILayoutSettings {
+    const config = vscode.workspace.getConfiguration('codegraphy.layout');
+    return {
+      algorithm: config.get<ILayoutSettings['algorithm']>('algorithm', 'forceAtlas2Based'),
+      hierarchicalDirection: config.get<ILayoutSettings['hierarchicalDirection']>('hierarchical.direction', 'UD'),
+    };
+  }
+
+  /**
+   * Sends current layout settings to the webview.
+   */
+  private _sendLayoutSettings(): void {
+    const settings = this._getLayoutSettings();
+    this._sendMessage({ type: 'LAYOUT_SETTINGS_UPDATED', payload: settings });
   }
 
   /**

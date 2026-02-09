@@ -246,6 +246,30 @@
           "minimum": 0,
           "maximum": 1,
           "description": "Pull toward the center of the viewport."
+        },
+        "codegraphy.layout.algorithm": {
+          "type": "string",
+          "default": "forceAtlas2Based",
+          "enum": ["forceAtlas2Based", "barnesHut", "repulsion", "hierarchical"],
+          "enumDescriptions": [
+            "Force Atlas 2 - good clustering (default)",
+            "Barnes Hut - efficient for large graphs",
+            "Repulsion - simple repulsion model",
+            "Hierarchical - shows import hierarchy"
+          ],
+          "description": "Graph layout algorithm"
+        },
+        "codegraphy.layout.hierarchical.direction": {
+          "type": "string",
+          "default": "UD",
+          "enum": ["UD", "DU", "LR", "RL"],
+          "enumDescriptions": [
+            "Up to Down",
+            "Down to Up",
+            "Left to Right",
+            "Right to Left"
+          ],
+          "description": "Direction for hierarchical layout"
         }
       }
     }
