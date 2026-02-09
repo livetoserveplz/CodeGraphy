@@ -14,6 +14,8 @@ CodeGraphy provides several settings to customize its behavior. Configure these 
 | `codegraphy.favorites` | string[] | `[]` | Favorite file paths (highlighted with yellow border) |
 | `codegraphy.bidirectionalEdges` | string | `"separate"` | How to display bidirectional connections |
 | `codegraphy.nodeSizeBy` | string | `"connections"` | What determines node size (`connections`, `file-size`, `access-count`, `uniform`) |
+| `codegraphy.layout.algorithm` | string | `"forceAtlas2Based"` | Layout algorithm (`forceAtlas2Based`, `barnesHut`, `hierarchical`, `manual`) |
+| `codegraphy.layout.hierarchical.direction` | string | `"UD"` | Hierarchical layout direction (`UD`, `DU`, `LR`, `RL`) |
 | `codegraphy.plugins` | string[] | `[]` | Paths to external plugins |
 | `codegraphy.fileColors` | object | `{}` | Custom colors for file extensions |
 | `codegraphy.layout.algorithm` | string | `"forceAtlas2Based"` | Graph layout algorithm |
@@ -216,6 +218,70 @@ Controls what determines the size of nodes in the graph visualization.
 ```json
 {
   "codegraphy.nodeSizeBy": "uniform"
+}
+```
+
+### `codegraphy.layout.algorithm`
+
+Controls how nodes are arranged in the graph visualization.
+
+```json
+{
+  "codegraphy.layout.algorithm": "forceAtlas2Based"
+}
+```
+
+**Available algorithms:**
+
+| Algorithm | Description |
+|-----------|-------------|
+| `forceAtlas2Based` | Force-directed layout with strong community detection (default) |
+| `barnesHut` | Barnes-Hut optimized force-directed layout, better for large graphs |
+| `hierarchical` | Tree-like layout showing dependency levels |
+| `manual` | Physics disabled, manually drag nodes to arrange |
+
+**Algorithm details:**
+
+- **`forceAtlas2Based`** — The default algorithm. Uses attractive and repulsive forces to create clusters of related files. Best for understanding code organization and finding tightly-coupled modules.
+
+- **`barnesHut`** — An optimized force-directed algorithm using Barnes-Hut approximation. Better performance on large graphs (100+ nodes) while maintaining similar visual results.
+
+- **`hierarchical`** — Arranges nodes in levels based on dependency direction. Entry points appear at the top (or left), with imported files below. Great for understanding dependency flow.
+
+- **`manual`** — Disables all physics simulation. Nodes stay exactly where you place them. Use this when you want full control over the layout or when the graph has stabilized and you want to fine-tune positions.
+
+**Example — Hierarchical layout for dependency visualization:**
+```json
+{
+  "codegraphy.layout.algorithm": "hierarchical",
+  "codegraphy.layout.hierarchical.direction": "LR"
+}
+```
+
+### `codegraphy.layout.hierarchical.direction`
+
+Sets the direction for hierarchical layout. Only applies when `layout.algorithm` is `"hierarchical"`.
+
+```json
+{
+  "codegraphy.layout.hierarchical.direction": "UD"
+}
+```
+
+**Available directions:**
+
+| Direction | Description |
+|-----------|-------------|
+| `UD` | Up to Down — root nodes at top (default) |
+| `DU` | Down to Up — root nodes at bottom |
+| `LR` | Left to Right — root nodes at left |
+| `RL` | Right to Left — root nodes at right |
+
+**Example — Left-to-right dependency flow:**
+```json
+{
+  "codegraphy.layout.algorithm": "hierarchical",
+  "codegraphy.layout.hierarchical.direction": "LR"
 }
 ```
 

@@ -16,7 +16,10 @@
     ".json": "#86EFAC",
     ".md": "#083FA1"
   },
-// Physics simulation settings (adjust via gear icon in graph view)
+  // Layout algorithm settings (adjust via gear icon in graph view)
+  "codegraphy.layout.algorithm": "forceAtlas2Based",
+  "codegraphy.layout.hierarchical.direction": "UD",
+  // Physics simulation settings (adjust via gear icon in graph view)
   "codegraphy.physics.gravitationalConstant": -80,
   "codegraphy.physics.springLength": 140,
   "codegraphy.physics.springConstant": 0.1,
