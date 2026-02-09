@@ -28,6 +28,7 @@ import {
 import { NodeTooltip } from './NodeTooltip';
 import { ThemeKind, adjustColorForLightTheme } from '../hooks/useTheme';
 import { postMessage } from '../lib/vscodeApi';
+import { findAllPaths, collectPathElements, PathResult } from '../utils/pathfinding';
 
 /** Yellow color for favorites */
 const FAVORITE_BORDER_COLOR = '#EAB308';
@@ -593,6 +594,11 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark', bid
   const [isBackgroundContext, setIsBackgroundContext] = useState(false);
   const selectedNodesRef = useRef(selectedNodes);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
+  const [pathHighlight, setPathHighlight] = useState<{
+    from: string;
+    to: string;
+    paths: PathResult[];
+  } | null>(null);
   
   // Context menu target (set synchronously on right-click)
   const contextTargetRef = useRef<string[]>([]);
@@ -919,7 +925,28 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark', bid
     network.on('click', (params) => {
       if (params.nodes.length > 0) {
         const nodeId = params.nodes[0] as string;
+        const isShift = params.event?.srcEvent?.shiftKey ?? false;
+
+        if (isShift && selectedNodesRef.current.length > 0) {
+          // Shift+click: find paths between previously selected node and this one
+          const fromNode = selectedNodesRef.current[0];
+          if (fromNode !== nodeId) {
+            const paths = findAllPaths(dataRef.current.edges, fromNode, nodeId);
+            if (paths.length > 0) {
+              setPathHighlight({ from: fromNode, to: nodeId, paths });
+            } else {
+              setPathHighlight(null);
+            }
+          }
+        } else {
+          // Normal click on a node: clear path highlighting
+          setPathHighlight(null);
+        }
+
         postMessage({ type: 'NODE_SELECTED', payload: { nodeId } });
+      } else {
+        // Clicked on empty space: clear path highlighting
+        setPathHighlight(null);
       }
     });
 
@@ -1172,6 +1199,74 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark', bid
   }, [hoveredNode, data, favorites, theme]);
 
   /**
+   * Handle path highlighting between two nodes.
+   * When active, dims all nodes/edges not on the found paths.
+   */
+  useEffect(() => {
+    if (!nodesRef.current || !edgesRef.current) return;
+    // Don't apply path highlighting if hover is active (hover takes visual priority)
+    if (hoveredNode) return;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const nodesDataSet = nodesRef.current as any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const edgesDataSet = edgesRef.current as any;
+
+    if (pathHighlight) {
+      const { nodeIds: onPathNodes, edgeIds: onPathEdges } = collectPathElements(pathHighlight.paths);
+      const isLight = themeRef.current === 'light';
+      const activeTextColor = isLight ? '#1e1e1e' : '#e2e8f0';
+      const dimTextColor = isLight ? '#c0c0c0' : '#3a3f47';
+      const dimEdgeColor = isLight ? '#e5e5e5' : '#1e2330';
+      const pathEdgeColor = '#22d3ee'; // cyan
+
+      data.nodes.forEach((node) => {
+        const onPath = onPathNodes.has(node.id);
+        const nodeColor = isLight ? adjustColorForLightTheme(node.color) : node.color;
+        const isFavorite = favorites.has(node.id);
+        nodesDataSet.update({
+          id: node.id,
+          opacity: onPath ? 1.0 : 0.15,
+          font: { color: onPath ? activeTextColor : dimTextColor, size: 12 },
+          color: {
+            background: nodeColor,
+            border: isFavorite ? FAVORITE_BORDER_COLOR : nodeColor,
+            highlight: { background: nodeColor, border: isFavorite ? FAVORITE_BORDER_COLOR : (isLight ? '#000000' : '#ffffff') },
+            hover: { background: nodeColor, border: isFavorite ? FAVORITE_BORDER_COLOR : (isLight ? '#64748b' : '#94a3b8') },
+          },
+        });
+      });
+
+      data.edges.forEach((edge) => {
+        const onPath = onPathEdges.has(edge.id);
+        edgesDataSet.update({
+          id: edge.id,
+          color: {
+            color: onPath ? pathEdgeColor : dimEdgeColor,
+            highlight: pathEdgeColor,
+            hover: pathEdgeColor,
+          },
+          width: onPath ? 3 : 1,
+        });
+      });
+    }
+    // Reset is handled by the hover effect's else branch when both hover and pathHighlight are null
+  }, [pathHighlight, hoveredNode, data, favorites, theme]);
+
+  /**
+   * Escape key clears path highlighting
+   */
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setPathHighlight(null);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  /**
    * Update edges when bidirectional mode changes
    */
   useEffect(() => {
@@ -1384,6 +1479,30 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark', bid
         )}
       </ContextMenuContent>
       
+      {/* Path highlighting indicator */}
+      {pathHighlight && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 8,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'rgba(34, 211, 238, 0.15)',
+            border: '1px solid rgba(34, 211, 238, 0.4)',
+            borderRadius: 6,
+            padding: '4px 12px',
+            fontSize: 12,
+            color: '#22d3ee',
+            pointerEvents: 'none',
+            zIndex: 10,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          Path: {pathHighlight.from.split('/').pop()} → {pathHighlight.to.split('/').pop()}
+          {' '}({pathHighlight.paths.length} path{pathHighlight.paths.length !== 1 ? 's' : ''}, shortest: {pathHighlight.paths[0]?.nodeIds.length - 1} hop{(pathHighlight.paths[0]?.nodeIds.length - 1) !== 1 ? 's' : ''})
+        </div>
+      )}
+
       {/* Tooltip */}
       <NodeTooltip
         path={tooltipData.path}
