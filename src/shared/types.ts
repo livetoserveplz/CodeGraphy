@@ -15,6 +15,26 @@
  */
 export type NodeSizeMode = 'connections' | 'file-size' | 'access-count' | 'uniform';
 
+/**
+ * Layout algorithm for the graph.
+ */
+export type LayoutAlgorithm = 'forceAtlas2Based' | 'barnesHut' | 'repulsion' | 'hierarchical';
+
+/**
+ * Direction for hierarchical layout.
+ */
+export type HierarchicalDirection = 'UD' | 'DU' | 'LR' | 'RL';
+
+/**
+ * Layout settings for the graph.
+ */
+export interface ILayoutSettings {
+  /** Layout algorithm to use */
+  algorithm: LayoutAlgorithm;
+  /** Direction for hierarchical layout */
+  hierarchicalDirection: HierarchicalDirection;
+}
+
 // ============================================================================
 // File Data (internal representation, what plugins will produce)
 // ============================================================================
@@ -269,6 +289,7 @@ export type ExtensionToWebviewMessage =
   | { type: 'NODE_ACCESS_COUNT_UPDATED'; payload: { nodeId: string; accessCount: number } }
   | { type: 'VIEWS_UPDATED'; payload: { views: IAvailableView[]; activeViewId: string } }
   | { type: 'PHYSICS_SETTINGS_UPDATED'; payload: IPhysicsSettings }
+  | { type: 'LAYOUT_SETTINGS_UPDATED'; payload: ILayoutSettings }
   | { type: 'DEPTH_LIMIT_UPDATED'; payload: { depthLimit: number } };
 
 /**

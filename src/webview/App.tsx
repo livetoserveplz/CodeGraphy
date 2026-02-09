@@ -6,7 +6,7 @@ import { ViewSwitcher } from './components/ViewSwitcher';
 import PhysicsSettings from './components/PhysicsSettings';
 import { DepthSlider } from './components/DepthSlider';
 import { useTheme } from './hooks/useTheme';
-import { IGraphData, IGraphNode, IAvailableView, BidirectionalEdgeMode, IPhysicsSettings, ExtensionToWebviewMessage } from '../shared/types';
+import { IGraphData, IGraphNode, IAvailableView, BidirectionalEdgeMode, IPhysicsSettings, ILayoutSettings, ExtensionToWebviewMessage } from '../shared/types';
 import { postMessage } from './lib/vscodeApi';
 
 /** Default physics settings */
@@ -92,6 +92,7 @@ export default function App(): React.ReactElement {
   const [availableViews, setAvailableViews] = useState<IAvailableView[]>([]);
   const [activeViewId, setActiveViewId] = useState<string>('codegraphy.connections');
   const [physicsSettings, setPhysicsSettings] = useState<IPhysicsSettings>(DEFAULT_PHYSICS);
+  const [layoutSettings, setLayoutSettings] = useState<ILayoutSettings>({ algorithm: 'forceAtlas2Based', hierarchicalDirection: 'UD' });
   const [depthLimit, setDepthLimit] = useState<number>(1);
   const theme = useTheme();
 
@@ -141,6 +142,9 @@ export default function App(): React.ReactElement {
           break;
         case 'PHYSICS_SETTINGS_UPDATED':
           setPhysicsSettings(message.payload);
+          break;
+        case 'LAYOUT_SETTINGS_UPDATED':
+          setLayoutSettings(message.payload);
           break;
         case 'DEPTH_LIMIT_UPDATED':
           setDepthLimit(message.payload.depthLimit);
@@ -222,6 +226,7 @@ export default function App(): React.ReactElement {
           theme={theme}
           bidirectionalMode={bidirectionalMode}
           physicsSettings={physicsSettings}
+          layoutSettings={layoutSettings}
         />
         <PhysicsSettings 
           settings={physicsSettings} 

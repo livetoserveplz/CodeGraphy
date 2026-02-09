@@ -212,6 +212,30 @@
           "default": "connections",
           "description": "What determines the size of nodes in the graph."
         },
+        "codegraphy.layout.algorithm": {
+          "type": "string",
+          "enum": ["forceAtlas2Based", "barnesHut", "hierarchical", "manual"],
+          "enumDescriptions": [
+            "Force-directed layout with strong community detection (default)",
+            "Barnes-Hut optimized force-directed layout for large graphs",
+            "Tree-like hierarchical layout showing dependency levels",
+            "Manual positioning with physics disabled"
+          ],
+          "default": "forceAtlas2Based",
+          "description": "Layout algorithm for arranging nodes in the graph."
+        },
+        "codegraphy.layout.hierarchical.direction": {
+          "type": "string",
+          "enum": ["UD", "DU", "LR", "RL"],
+          "enumDescriptions": [
+            "Up to Down - root nodes at top",
+            "Down to Up - root nodes at bottom",
+            "Left to Right - root nodes at left",
+            "Right to Left - root nodes at right"
+          ],
+          "default": "UD",
+          "description": "Direction for hierarchical layout. Only applies when layout.algorithm is 'hierarchical'."
+        },
         "codegraphy.physics.gravitationalConstant": {
           "type": "number",
           "default": -50,
@@ -246,6 +270,30 @@
           "minimum": 0,
           "maximum": 1,
           "description": "Pull toward the center of the viewport."
+        },
+        "codegraphy.layout.algorithm": {
+          "type": "string",
+          "default": "forceAtlas2Based",
+          "enum": ["forceAtlas2Based", "barnesHut", "repulsion", "hierarchical"],
+          "enumDescriptions": [
+            "Force Atlas 2 - good clustering (default)",
+            "Barnes Hut - efficient for large graphs",
+            "Repulsion - simple repulsion model",
+            "Hierarchical - shows import hierarchy"
+          ],
+          "description": "Graph layout algorithm"
+        },
+        "codegraphy.layout.hierarchical.direction": {
+          "type": "string",
+          "default": "UD",
+          "enum": ["UD", "DU", "LR", "RL"],
+          "enumDescriptions": [
+            "Up to Down",
+            "Down to Up",
+            "Left to Right",
+            "Right to Left"
+          ],
+          "description": "Direction for hierarchical layout"
         }
       }
     }

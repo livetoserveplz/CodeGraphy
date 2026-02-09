@@ -14,6 +14,7 @@ import {
   IFileInfo,
   BidirectionalEdgeMode,
   IPhysicsSettings,
+  ILayoutSettings,
   ExtensionToWebviewMessage,
   NodeSizeMode,
 } from '../../shared/types';
@@ -39,6 +40,7 @@ interface GraphProps {
   theme?: ThemeKind;
   bidirectionalMode?: BidirectionalEdgeMode;
   physicsSettings?: IPhysicsSettings;
+  layoutSettings?: ILayoutSettings;
 }
 
 /**
@@ -566,6 +568,84 @@ function sendAllPositions(network: Network, nodeIds: string[]): void {
   postMessage({ type: 'POSITIONS_UPDATED', payload: { positions } });
 }
 
+/**
+ * Build vis-network options based on layout and physics settings.
+ */
+function buildNetworkOptions(layout: ILayoutSettings, physics: IPhysicsSettings): Options {
+  const base = { ...NETWORK_OPTIONS };
+
+  if (layout.algorithm === 'hierarchical') {
+    return {
+      ...base,
+      layout: {
+        hierarchical: {
+          enabled: true,
+          direction: layout.hierarchicalDirection,
+          sortMethod: 'directed',
+          nodeSpacing: 150,
+          levelSeparation: 150,
+        },
+      },
+      physics: {
+        enabled: true,
+        hierarchicalRepulsion: {
+          centralGravity: 0.0,
+          springLength: physics.springLength,
+          springConstant: physics.springConstant,
+          nodeDistance: 120,
+          damping: physics.damping,
+        },
+        solver: 'hierarchicalRepulsion',
+        stabilization: {
+          enabled: true,
+          iterations: 200,
+          updateInterval: 25,
+        },
+      },
+    };
+  }
+
+  // Physics-based solvers
+  const solverSettings: Record<string, object> = {
+    forceAtlas2Based: {
+      gravitationalConstant: physics.gravitationalConstant,
+      centralGravity: physics.centralGravity,
+      springLength: physics.springLength,
+      springConstant: physics.springConstant,
+      damping: physics.damping,
+    },
+    barnesHut: {
+      gravitationalConstant: physics.gravitationalConstant * 40, // barnesHut uses larger values
+      centralGravity: physics.centralGravity,
+      springLength: physics.springLength,
+      springConstant: physics.springConstant,
+      damping: physics.damping,
+    },
+    repulsion: {
+      centralGravity: physics.centralGravity,
+      springLength: physics.springLength,
+      springConstant: physics.springConstant,
+      damping: physics.damping,
+      nodeDistance: 100,
+    },
+  };
+
+  return {
+    ...base,
+    layout: { randomSeed: 42 },
+    physics: {
+      enabled: true,
+      solver: layout.algorithm as 'forceAtlas2Based' | 'barnesHut' | 'repulsion',
+      [layout.algorithm]: solverSettings[layout.algorithm],
+      stabilization: {
+        enabled: true,
+        iterations: 200,
+        updateInterval: 25,
+      },
+    },
+  };
+}
+
 /** Default physics settings */
 const DEFAULT_PHYSICS: IPhysicsSettings = {
   gravitationalConstant: -50,
@@ -578,7 +658,13 @@ const DEFAULT_PHYSICS: IPhysicsSettings = {
 /**
  * Graph component with context menu and multi-select support.
  */
-export default function Graph({ data, favorites = new Set(), theme = 'dark', bidirectionalMode = 'separate', physicsSettings = DEFAULT_PHYSICS }: GraphProps): React.ReactElement {
+/** Default layout settings */
+const DEFAULT_LAYOUT: ILayoutSettings = {
+  algorithm: 'forceAtlas2Based',
+  hierarchicalDirection: 'UD',
+};
+
+export default function Graph({ data, favorites = new Set(), theme = 'dark', bidirectionalMode = 'separate', physicsSettings = DEFAULT_PHYSICS, layoutSettings = DEFAULT_LAYOUT }: GraphProps): React.ReactElement {
   const containerRef = useRef<HTMLDivElement>(null);
   const networkRef = useRef<Network | null>(null);
   const nodesRef = useRef<DataSet<ReturnType<typeof toVisNode>> | null>(null);
@@ -896,11 +982,12 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark', bid
     nodesRef.current = nodes;
     edgesRef.current = edges;
 
-    // Create network
+    // Create network with layout-aware options
+    const initialOptions = buildNetworkOptions(layoutSettings, physicsSettings);
     const network = new Network(
       containerRef.current,
       { nodes, edges },
-      NETWORK_OPTIONS
+      initialOptions
     );
 
     networkRef.current = network;
@@ -1188,6 +1275,31 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark', bid
   }, [bidirectionalMode, data.edges]);
 
   /**
+   * Track previous layout settings to detect changes.
+   */
+  const prevLayoutRef = useRef<ILayoutSettings | null>(null);
+
+  /**
+   * Update layout settings when they change.
+   */
+  useEffect(() => {
+    const network = networkRef.current;
+    if (!network) return;
+
+    const prev = prevLayoutRef.current;
+    const changed = !prev ||
+      prev.algorithm !== layoutSettings.algorithm ||
+      prev.hierarchicalDirection !== layoutSettings.hierarchicalDirection;
+
+    if (!changed) return;
+    prevLayoutRef.current = { ...layoutSettings };
+
+    const newOptions = buildNetworkOptions(layoutSettings, physicsSettings);
+    network.setOptions(newOptions);
+    network.startSimulation();
+  }, [layoutSettings, physicsSettings]);
+
+  /**
    * Track previous physics settings to avoid unnecessary simulation restarts.
    */
   const prevPhysicsRef = useRef<IPhysicsSettings | null>(null);
@@ -1215,24 +1327,15 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark', bid
     // Store current settings for next comparison
     prevPhysicsRef.current = { ...physicsSettings };
 
-    // Apply new physics settings
-    network.setOptions({
-      physics: {
-        forceAtlas2Based: {
-          gravitationalConstant: physicsSettings.gravitationalConstant,
-          centralGravity: physicsSettings.centralGravity,
-          springLength: physicsSettings.springLength,
-          springConstant: physicsSettings.springConstant,
-          damping: physicsSettings.damping,
-        },
-      },
-    });
+    // Apply new physics settings using layout-aware options
+    const newOptions = buildNetworkOptions(layoutSettings, physicsSettings);
+    network.setOptions(newOptions);
 
     // Restart the physics simulation to apply new settings
     // This is necessary because vis-network doesn't automatically
     // restart physics when options are changed after stabilization
     network.startSimulation();
-  }, [physicsSettings]);
+  }, [physicsSettings, layoutSettings]);
 
   /**
    * Handle context menu trigger - captures node BEFORE Radix opens menu
