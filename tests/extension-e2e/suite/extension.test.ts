@@ -107,13 +107,13 @@ suite('Configuration Tests', () => {
     const originalValue = config.get<number>('gravitationalConstant');
     
     // Update to test value
-    await config.update('gravitationalConstant', -100, vscode.ConfigurationTarget.Workspace);
+    await config.update('gravitationalConstant', -100, vscode.ConfigurationTarget.Global);
     
     // Verify update
     const newValue = config.get<number>('gravitationalConstant');
     assert.strictEqual(newValue, -100, 'Config should be updated');
     
     // Restore original value
-    await config.update('gravitationalConstant', originalValue, vscode.ConfigurationTarget.Workspace);
+    await config.update('gravitationalConstant', originalValue, vscode.ConfigurationTarget.Global);
   });
 });
