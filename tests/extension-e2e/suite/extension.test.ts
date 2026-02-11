@@ -106,14 +106,15 @@ suite('Configuration Tests', () => {
     // Get current value
     const originalValue = config.get<number>('gravitationalConstant');
     
-    // Update to test value
+    // Update to test value — use Global target for CI compatibility
     await config.update('gravitationalConstant', -100, vscode.ConfigurationTarget.Global);
     
-    // Verify update
-    const newValue = config.get<number>('gravitationalConstant');
+    // Re-fetch configuration object to see the updated value
+    const updatedConfig = vscode.workspace.getConfiguration('codegraphy.physics');
+    const newValue = updatedConfig.get<number>('gravitationalConstant');
     assert.strictEqual(newValue, -100, 'Config should be updated');
     
     // Restore original value
-    await config.update('gravitationalConstant', originalValue, vscode.ConfigurationTarget.Global);
+    await updatedConfig.update('gravitationalConstant', originalValue, vscode.ConfigurationTarget.Global);
   });
 });
