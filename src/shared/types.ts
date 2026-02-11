@@ -266,6 +266,7 @@ export type ExtensionToWebviewMessage =
   | { type: 'REQUEST_EXPORT_PNG' }
   | { type: 'REQUEST_EXPORT_SVG' }
   | { type: 'REQUEST_EXPORT_JSON' }
+  | { type: 'REQUEST_EXPORT_HTML' }
   | { type: 'NODE_ACCESS_COUNT_UPDATED'; payload: { nodeId: string; accessCount: number } }
   | { type: 'VIEWS_UPDATED'; payload: { views: IAvailableView[]; activeViewId: string } }
   | { type: 'PHYSICS_SETTINGS_UPDATED'; payload: IPhysicsSettings }
@@ -310,6 +311,7 @@ export type WebviewToExtensionMessage =
   | { type: 'EXPORT_PNG'; payload: { dataUrl: string; filename?: string } }
   | { type: 'EXPORT_SVG'; payload: { svg: string; filename?: string } }
   | { type: 'EXPORT_JSON'; payload: { json: string; filename?: string } }
+  | { type: 'EXPORT_HTML'; payload: { html: string; filename?: string } }
   | { type: 'UPDATE_PHYSICS_SETTING'; payload: { key: keyof IPhysicsSettings; value: number } }
   | { type: 'RESET_PHYSICS_SETTINGS' }
   | { type: 'GET_PHYSICS_SETTINGS' }

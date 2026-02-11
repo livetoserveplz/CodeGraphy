@@ -59,6 +59,10 @@
         "title": "CodeGraphy: Export Layout as JSON"
       },
       {
+        "command": "codegraphy.exportHtml",
+        "title": "CodeGraphy: Export as Interactive HTML"
+      },
+      {
         "command": "codegraphy.clearCache",
         "title": "CodeGraphy: Clear Cache and Refresh"
       }

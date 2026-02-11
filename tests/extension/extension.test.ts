@@ -50,7 +50,7 @@ describe('Extension', () => {
 
       // view provider (1) + config listener (1) + active editor listener (1) + save listener (1) 
       // + file watcher events (2) + file watcher (1) + 10 commands (open, fitView, zoomIn, zoomOut, undo, redo, exportPng, exportSvg, exportJson, clearCache)
-      expect(mockContext.subscriptions.length).toBe(17);
+      expect(mockContext.subscriptions.length).toBe(18);
     });
   });
 

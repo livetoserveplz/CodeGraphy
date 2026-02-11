@@ -156,6 +156,12 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   context.subscriptions.push(
+    vscode.commands.registerCommand('codegraphy.exportHtml', () => {
+      provider.requestExportHtml();
+    })
+  );
+
+  context.subscriptions.push(
     vscode.commands.registerCommand('codegraphy.clearCache', () => {
       provider.clearCacheAndRefresh();
     })
