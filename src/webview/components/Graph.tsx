@@ -28,6 +28,7 @@ import {
 import { NodeTooltip } from './NodeTooltip';
 import { ThemeKind, adjustColorForLightTheme } from '../hooks/useTheme';
 import { postMessage } from '../lib/vscodeApi';
+import { generateInteractiveHtml } from '../utils/exportHtml';
 
 /** Yellow color for favorites */
 const FAVORITE_BORDER_COLOR = '#EAB308';
@@ -552,6 +553,35 @@ function exportAsJson(network: Network, data: IGraphData): void {
 }
 
 /**
+ * Export graph as a self-contained interactive HTML file.
+ */
+function exportAsHtml(
+  nodes: DataSet<ReturnType<typeof toVisNode>>,
+  edges: DataSet<ReturnType<typeof toVisEdge>>
+): void {
+  try {
+    const exportNodes = nodes.get().map(n => ({
+      id: n.id,
+      label: n.label || String(n.id),
+      color: n.color,
+      size: n.size,
+    }));
+    const exportEdges = edges.get().map(e => ({
+      from: e.from,
+      to: e.to,
+    }));
+
+    const html = generateInteractiveHtml(exportNodes, exportEdges);
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const filename = `codegraphy-${timestamp}.html`;
+
+    postMessage({ type: 'EXPORT_HTML', payload: { html, filename } });
+  } catch (error) {
+    console.error('[CodeGraphy] HTML export failed:', error);
+  }
+}
+
+/**
  * Send all current positions to extension for persistence
  */
 function sendAllPositions(network: Network, nodeIds: string[]): void {
@@ -734,6 +764,11 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark', bid
           break;
         case 'REQUEST_EXPORT_JSON':
           exportAsJson(network, dataRef.current);
+          break;
+        case 'REQUEST_EXPORT_HTML':
+          if (nodesRef.current && edgesRef.current) {
+            exportAsHtml(nodesRef.current, edgesRef.current);
+          }
           break;
         case 'NODE_ACCESS_COUNT_UPDATED': {
           // Update node's access count and recalculate sizes in real-time

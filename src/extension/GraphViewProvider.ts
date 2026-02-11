@@ -559,6 +559,13 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
+   * Request the webview to export as interactive HTML.
+   */
+  public requestExportHtml(): void {
+    this._sendMessage({ type: 'REQUEST_EXPORT_HTML' });
+  }
+
+  /**
    * Sends a message to the webview.
    * 
    * @param message - Message to send to the webview
@@ -705,6 +712,10 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
           
         case 'EXPORT_JSON':
           await this._saveExportedJson(message.payload.json, message.payload.filename);
+          break;
+
+        case 'EXPORT_HTML':
+          await this._saveExportedHtml(message.payload.html, message.payload.filename);
           break;
           
         case 'GET_PHYSICS_SETTINGS':
@@ -1046,6 +1057,41 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
       }
     } catch (error) {
       vscode.window.showErrorMessage(`Failed to export JSON: ${error}`);
+    }
+  }
+
+  /**
+   * Saves an interactive HTML export to disk.
+   */
+  private async _saveExportedHtml(htmlContent: string, filename?: string): Promise<void> {
+    try {
+      const defaultFilename = filename || `codegraphy-${Date.now()}.html`;
+      const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri;
+      const defaultUri = workspaceFolder
+        ? vscode.Uri.joinPath(workspaceFolder, defaultFilename)
+        : vscode.Uri.file(defaultFilename);
+      const saveUri = await vscode.window.showSaveDialog({
+        defaultUri,
+        filters: { 'HTML Files': ['html'] },
+        saveLabel: 'Export',
+        title: 'Export Graph as Interactive HTML',
+      });
+
+      if (!saveUri) return;
+
+      const buffer = Buffer.from(htmlContent, 'utf-8');
+      await vscode.workspace.fs.writeFile(saveUri, buffer);
+
+      const action = await vscode.window.showInformationMessage(
+        `Interactive graph exported to ${saveUri.fsPath}`,
+        'Open in Browser'
+      );
+
+      if (action === 'Open in Browser') {
+        await vscode.env.openExternal(saveUri);
+      }
+    } catch (error) {
+      vscode.window.showErrorMessage(`Failed to export HTML: ${error}`);
     }
   }
 
