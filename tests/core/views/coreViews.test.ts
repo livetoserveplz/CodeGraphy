@@ -3,6 +3,7 @@ import {
   connectionsView,
   depthGraphView,
   subfolderView,
+  folderView,
   coreViews,
 } from '../../../src/core/views';
 import { IGraphData } from '../../../src/shared/types';
@@ -35,10 +36,11 @@ function createContext(overrides: Partial<IViewContext> = {}): IViewContext {
 describe('Core Views', () => {
   describe('coreViews array', () => {
     it('should contain all core views', () => {
-      expect(coreViews).toHaveLength(3);
+      expect(coreViews).toHaveLength(4);
       expect(coreViews).toContain(connectionsView);
       expect(coreViews).toContain(depthGraphView);
       expect(coreViews).toContain(subfolderView);
+      expect(coreViews).toContain(folderView);
     });
   });
 
@@ -265,6 +267,109 @@ describe('Core Views', () => {
       const result = subfolderView.transform(dataWithMode, context);
 
       expect(result.nodeSizeMode).toBe('file-size');
+    });
+  });
+
+  describe('folderView', () => {
+    it('should have correct metadata', () => {
+      expect(folderView.id).toBe('codegraphy.folder');
+      expect(folderView.name).toBe('Folder View');
+      expect(folderView.icon).toBe('folder');
+      expect(folderView.pluginId).toBeUndefined();
+    });
+
+    it('should create folder nodes for all directories', () => {
+      const context = createContext();
+      const result = folderView.transform(sampleGraphData, context);
+
+      const folderNodes = result.nodes.filter(n => n.isFolder);
+      const folderIds = folderNodes.map(n => n.id).sort();
+
+      expect(folderIds).toEqual(['.', 'src', 'src/components', 'src/utils', 'tests']);
+    });
+
+    it('should preserve original file nodes', () => {
+      const context = createContext();
+      const result = folderView.transform(sampleGraphData, context);
+
+      const fileNodes = result.nodes.filter(n => !n.isFolder);
+      expect(fileNodes).toHaveLength(5);
+      expect(fileNodes.map(n => n.id)).toContain('src/app.ts');
+    });
+
+    it('should create parent-child edges between folders', () => {
+      const context = createContext();
+      const result = folderView.transform(sampleGraphData, context);
+
+      expect(result.edges).toContainEqual({ id: '.->src', from: '.', to: 'src' });
+      expect(result.edges).toContainEqual({ id: '.->tests', from: '.', to: 'tests' });
+      expect(result.edges).toContainEqual({ id: 'src->src/utils', from: 'src', to: 'src/utils' });
+      expect(result.edges).toContainEqual({ id: 'src->src/components', from: 'src', to: 'src/components' });
+    });
+
+    it('should create folder-to-file edges', () => {
+      const context = createContext();
+      const result = folderView.transform(sampleGraphData, context);
+
+      expect(result.edges).toContainEqual({ id: 'src->src/app.ts', from: 'src', to: 'src/app.ts' });
+      expect(result.edges).toContainEqual({ id: 'src/utils->src/utils/helpers.ts', from: 'src/utils', to: 'src/utils/helpers.ts' });
+      expect(result.edges).toContainEqual({ id: 'tests->tests/app.test.ts', from: 'tests', to: 'tests/app.test.ts' });
+    });
+
+    it('should set fileCount on folder nodes', () => {
+      const context = createContext();
+      const result = folderView.transform(sampleGraphData, context);
+
+      const srcFolder = result.nodes.find(n => n.id === 'src');
+      expect(srcFolder?.fileCount).toBe(1);
+
+      const utilsFolder = result.nodes.find(n => n.id === 'src/utils');
+      expect(utilsFolder?.fileCount).toBe(2);
+    });
+
+    it('should handle flat structure (files at root)', () => {
+      const flatData: IGraphData = {
+        nodes: [
+          { id: 'index.ts', label: 'index.ts', color: '#93C5FD' },
+          { id: 'config.json', label: 'config.json', color: '#86EFAC' },
+        ],
+        edges: [],
+      };
+      const context = createContext();
+      const result = folderView.transform(flatData, context);
+
+      const folderNodes = result.nodes.filter(n => n.isFolder);
+      expect(folderNodes).toHaveLength(1);
+      expect(folderNodes[0].id).toBe('.');
+      expect(folderNodes[0].fileCount).toBe(2);
+
+      expect(result.edges).toHaveLength(2);
+    });
+
+    it('should handle deeply nested folders', () => {
+      const deepData: IGraphData = {
+        nodes: [
+          { id: 'a/b/c/d/file.ts', label: 'file.ts', color: '#93C5FD' },
+        ],
+        edges: [],
+      };
+      const context = createContext();
+      const result = folderView.transform(deepData, context);
+
+      const folderIds = result.nodes.filter(n => n.isFolder).map(n => n.id).sort();
+      expect(folderIds).toEqual(['.', 'a', 'a/b', 'a/b/c', 'a/b/c/d']);
+    });
+
+    it('should preserve nodeSizeMode in output', () => {
+      const dataWithMode: IGraphData = { ...sampleGraphData, nodeSizeMode: 'file-size' };
+      const context = createContext();
+      const result = folderView.transform(dataWithMode, context);
+
+      expect(result.nodeSizeMode).toBe('file-size');
+    });
+
+    it('should not have isAvailable (always available)', () => {
+      expect(folderView.isAvailable).toBeUndefined();
     });
   });
 });

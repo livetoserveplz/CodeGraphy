@@ -139,6 +139,18 @@ export interface IGraphNode {
    * Used for visual styling (opacity, size) in depth graph view.
    */
   depthLevel?: number;
+
+  /**
+   * Whether this node represents a folder rather than a file.
+   * Used by the Folder View to distinguish directory nodes.
+   */
+  isFolder?: boolean;
+
+  /**
+   * Number of files contained in this folder (direct children only).
+   * Only set on folder nodes in the Folder View.
+   */
+  fileCount?: number;
 }
 
 /**
