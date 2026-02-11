@@ -5,3 +5,9 @@ dist/
 coverage/
 *.log
 .DS_Store
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
+node_modules
