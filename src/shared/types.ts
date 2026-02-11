@@ -15,6 +15,16 @@
  */
 export type NodeSizeMode = 'connections' | 'file-size' | 'access-count' | 'uniform';
 
+/**
+ * Represents a visual group of nodes in the graph.
+ */
+export interface INodeGroup {
+  id: string;
+  name: string;
+  color: string;
+  nodeIds: string[];
+}
+
 // ============================================================================
 // File Data (internal representation, what plugins will produce)
 // ============================================================================
@@ -269,7 +279,8 @@ export type ExtensionToWebviewMessage =
   | { type: 'NODE_ACCESS_COUNT_UPDATED'; payload: { nodeId: string; accessCount: number } }
   | { type: 'VIEWS_UPDATED'; payload: { views: IAvailableView[]; activeViewId: string } }
   | { type: 'PHYSICS_SETTINGS_UPDATED'; payload: IPhysicsSettings }
-  | { type: 'DEPTH_LIMIT_UPDATED'; payload: { depthLimit: number } };
+  | { type: 'DEPTH_LIMIT_UPDATED'; payload: { depthLimit: number } }
+  | { type: 'GROUPS_UPDATED'; payload: { groups: INodeGroup[] } };
 
 /**
  * Messages sent from the Webview to the Extension.
@@ -319,7 +330,10 @@ export type WebviewToExtensionMessage =
   // View switching
   | { type: 'CHANGE_VIEW'; payload: { viewId: string } }
   // Depth graph settings
-  | { type: 'CHANGE_DEPTH_LIMIT'; payload: { depthLimit: number } };
+  | { type: 'CHANGE_DEPTH_LIMIT'; payload: { depthLimit: number } }
+  | { type: 'CREATE_GROUP'; payload: { name: string; nodeIds: string[] } }
+  | { type: 'DELETE_GROUP'; payload: { groupId: string } }
+  | { type: 'GET_GROUPS' };
 
 /**
  * File information returned from extension for tooltips.

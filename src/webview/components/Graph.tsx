@@ -16,6 +16,7 @@ import {
   IPhysicsSettings,
   ExtensionToWebviewMessage,
   NodeSizeMode,
+  INodeGroup,
 } from '../../shared/types';
 import {
   ContextMenu,
@@ -28,6 +29,7 @@ import {
 import { NodeTooltip } from './NodeTooltip';
 import { ThemeKind, adjustColorForLightTheme } from '../hooks/useTheme';
 import { postMessage } from '../lib/vscodeApi';
+import { convexHull, expandHull, drawRoundedHull } from '../utils/groupHull';
 
 /** Yellow color for favorites */
 const FAVORITE_BORDER_COLOR = '#EAB308';
@@ -593,7 +595,12 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark', bid
   const [isBackgroundContext, setIsBackgroundContext] = useState(false);
   const selectedNodesRef = useRef(selectedNodes);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
-  
+
+  // Node groups
+  const [groups, setGroups] = useState<INodeGroup[]>([]);
+  const groupsRef = useRef(groups);
+  groupsRef.current = groups;
+
   // Context menu target (set synchronously on right-click)
   const contextTargetRef = useRef<string[]>([]);
   
@@ -685,6 +692,24 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark', bid
       case 'createFile':
         postMessage({ type: 'CREATE_FILE', payload: { directory: '.' } });
         break;
+
+      case 'createGroup': {
+        const name = prompt('Group name:');
+        if (name && targetPaths.length >= 2) {
+          postMessage({ type: 'CREATE_GROUP', payload: { name, nodeIds: targetPaths } });
+        }
+        break;
+      }
+
+      case 'removeGroup': {
+        const group = groupsRef.current.find(g =>
+          targetPaths.some(p => g.nodeIds.includes(p))
+        );
+        if (group) {
+          postMessage({ type: 'DELETE_GROUP', payload: { groupId: group.id } });
+        }
+        break;
+      }
     }
   }, []); // contextTargetRef is stable, no deps needed
 
@@ -768,6 +793,9 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark', bid
           }
           break;
         }
+        case 'GROUPS_UPDATED':
+          setGroups(message.payload.groups);
+          break;
       }
     };
 
@@ -909,6 +937,80 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark', bid
     // Save positions after physics stabilization
     network.on('stabilized', () => {
       sendAllPositions(network, nodes.getIds() as string[]);
+    });
+
+    // Apply group attraction while physics is running
+    network.on('beforeDrawing', () => {
+      const currentGroups = groupsRef.current;
+      const nodesData = nodesRef.current;
+      if (!nodesData || currentGroups.length === 0) return;
+
+      const updates: { id: string; x: number; y: number }[] = [];
+      for (const group of currentGroups) {
+        const positions = group.nodeIds
+          .map(id => {
+            try {
+              return { id, pos: network.getPosition(id) };
+            } catch {
+              return null;
+            }
+          })
+          .filter((p): p is { id: string; pos: { x: number; y: number } } => p !== null);
+
+        if (positions.length < 2) continue;
+        const cx = positions.reduce((s, p) => s + p.pos.x, 0) / positions.length;
+        const cy = positions.reduce((s, p) => s + p.pos.y, 0) / positions.length;
+
+        for (const { id, pos } of positions) {
+          const dx = (cx - pos.x) * 0.02;
+          const dy = (cy - pos.y) * 0.02;
+          updates.push({ id, x: pos.x + dx, y: pos.y + dy });
+        }
+      }
+
+      if (updates.length > 0) {
+        nodesData.update(updates);
+      }
+    });
+
+    // Draw group hulls on canvas after each frame
+    network.on('afterDrawing', (ctx: CanvasRenderingContext2D) => {
+      const currentGroups = groupsRef.current;
+      if (currentGroups.length === 0) return;
+
+      for (const group of currentGroups) {
+        const positions = group.nodeIds
+          .map(id => {
+            try {
+              return network.getPosition(id);
+            } catch {
+              return null;
+            }
+          })
+          .filter((p): p is { x: number; y: number } => p !== null);
+
+        if (positions.length === 0) continue;
+
+        const hull = convexHull(positions);
+        const expanded = expandHull(hull, 40);
+
+        ctx.save();
+        ctx.beginPath();
+        drawRoundedHull(ctx, expanded, 20);
+        ctx.fillStyle = group.color + '20';
+        ctx.fill();
+        ctx.strokeStyle = group.color;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        const cx = positions.reduce((s, p) => s + p.x, 0) / positions.length;
+        const minY = Math.min(...positions.map(p => p.y));
+        ctx.fillStyle = group.color;
+        ctx.font = 'bold 14px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(group.name, cx, minY - 50);
+        ctx.restore();
+      }
     });
 
     // Handle selection changes
@@ -1357,6 +1459,20 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark', bid
             {!isMultiSelect && (
               <ContextMenuItem onClick={() => handleContextAction('focus')}>
                 Focus Node
+              </ContextMenuItem>
+            )}
+
+            <ContextMenuSeparator />
+
+            {isMultiSelect && (
+              <ContextMenuItem onClick={() => handleContextAction('createGroup')}>
+                Create Group...
+              </ContextMenuItem>
+            )}
+
+            {menuTargets.some(id => groups.some(g => g.nodeIds.includes(id))) && (
+              <ContextMenuItem onClick={() => handleContextAction('removeGroup')}>
+                Remove from Group
               </ContextMenuItem>
             )}
 

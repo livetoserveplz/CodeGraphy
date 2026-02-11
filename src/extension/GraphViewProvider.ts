@@ -9,6 +9,7 @@ import * as vscode from 'vscode';
 import {
   IGraphData,
   IAvailableView,
+  INodeGroup,
   BidirectionalEdgeMode,
   IPhysicsSettings,
   ExtensionToWebviewMessage,
@@ -48,6 +49,9 @@ const DEPTH_LIMIT_KEY = 'codegraphy.depthLimit';
 
 /** Default depth limit for depth graph view */
 const DEFAULT_DEPTH_LIMIT = 1;
+
+/** Storage key for node groups */
+const GROUPS_KEY = 'codegraphy.nodeGroups';
 
 /**
  * Map of node IDs to their persisted positions.
@@ -640,6 +644,8 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
           this._sendSettings();
           // Send physics settings
           this._sendPhysicsSettings();
+          // Send node groups
+          this._sendGroups();
           break;
 
         case 'NODE_SELECTED':
@@ -749,6 +755,33 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
           
         case 'CHANGE_DEPTH_LIMIT':
           await this.setDepthLimit(message.payload.depthLimit);
+          break;
+
+        case 'CREATE_GROUP': {
+          const { name, nodeIds } = message.payload;
+          const groups = this._context.workspaceState.get<INodeGroup[]>(GROUPS_KEY) ?? [];
+          const newGroup: INodeGroup = {
+            id: `group-${Date.now()}`,
+            name,
+            color: ['#4FC3F7', '#81C784', '#FFB74D', '#E57373', '#BA68C8', '#4DB6AC', '#FFD54F', '#F06292'][groups.length % 8],
+            nodeIds,
+          };
+          groups.push(newGroup);
+          await this._context.workspaceState.update(GROUPS_KEY, groups);
+          this._sendGroups();
+          break;
+        }
+
+        case 'DELETE_GROUP': {
+          const groups = this._context.workspaceState.get<INodeGroup[]>(GROUPS_KEY) ?? [];
+          const filtered = groups.filter(g => g.id !== message.payload.groupId);
+          await this._context.workspaceState.update(GROUPS_KEY, filtered);
+          this._sendGroups();
+          break;
+        }
+
+        case 'GET_GROUPS':
+          this._sendGroups();
           break;
       }
     });
@@ -1185,6 +1218,14 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
   /**
    * Sends current physics settings to the webview.
    */
+  /**
+   * Sends node groups to the webview.
+   */
+  private _sendGroups(): void {
+    const groups = this._context.workspaceState.get<INodeGroup[]>(GROUPS_KEY) ?? [];
+    this._sendMessage({ type: 'GROUPS_UPDATED', payload: { groups } });
+  }
+
   private _sendPhysicsSettings(): void {
     const settings = this._getPhysicsSettings();
     this._sendMessage({ type: 'PHYSICS_SETTINGS_UPDATED', payload: settings });
