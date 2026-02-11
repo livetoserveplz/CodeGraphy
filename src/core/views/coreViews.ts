@@ -161,6 +161,90 @@ export const subfolderView: IView = {
 };
 
 /**
+ * Folder View - shows the project's directory structure as a tree graph.
+ * Creates folder nodes and edges representing the file system hierarchy
+ * instead of import/dependency connections.
+ */
+export const folderView: IView = {
+  id: 'codegraphy.folder',
+  name: 'Folder View',
+  icon: 'folder',
+  description: 'Shows the project directory structure as a hierarchical tree',
+
+  transform(data: IGraphData, _context: IViewContext): IGraphData {
+    const folderSet = new Set<string>();
+    const fileFolderMap = new Map<string, string>();
+
+    for (const node of data.nodes) {
+      const lastSlash = node.id.lastIndexOf('/');
+      if (lastSlash === -1) {
+        fileFolderMap.set(node.id, '.');
+        folderSet.add('.');
+      } else {
+        const parentFolder = node.id.substring(0, lastSlash);
+        fileFolderMap.set(node.id, parentFolder);
+
+        let current = parentFolder;
+        while (current) {
+          folderSet.add(current);
+          const slash = current.lastIndexOf('/');
+          if (slash === -1) {
+            folderSet.add('.');
+            break;
+          }
+          current = current.substring(0, slash);
+        }
+      }
+    }
+
+    const fileCountMap = new Map<string, number>();
+    for (const folder of fileFolderMap.values()) {
+      fileCountMap.set(folder, (fileCountMap.get(folder) ?? 0) + 1);
+    }
+
+    const folderNodes: IGraphData['nodes'] = [];
+    for (const folder of folderSet) {
+      const label = folder === '.' ? '.' : folder.substring(folder.lastIndexOf('/') + 1);
+      folderNodes.push({
+        id: folder,
+        label,
+        color: '#A1A1AA',
+        isFolder: true,
+        fileCount: fileCountMap.get(folder) ?? 0,
+      });
+    }
+
+    const fileNodes = data.nodes.map(n => ({ ...n }));
+
+    const edges: IGraphData['edges'] = [];
+    for (const folder of folderSet) {
+      if (folder === '.') continue;
+      const slash = folder.lastIndexOf('/');
+      const parent = slash === -1 ? '.' : folder.substring(0, slash);
+      edges.push({
+        id: `${parent}->${folder}`,
+        from: parent,
+        to: folder,
+      });
+    }
+
+    for (const [fileId, parentFolder] of fileFolderMap) {
+      edges.push({
+        id: `${parentFolder}->${fileId}`,
+        from: parentFolder,
+        to: fileId,
+      });
+    }
+
+    return {
+      nodes: [...folderNodes, ...fileNodes],
+      edges,
+      nodeSizeMode: data.nodeSizeMode,
+    };
+  },
+};
+
+/**
  * All core views that ship with CodeGraphy.
  * Register these on startup.
  */
@@ -168,4 +252,5 @@ export const coreViews: IView[] = [
   connectionsView,
   depthGraphView,
   subfolderView,
+  folderView,
 ];

@@ -8,6 +8,7 @@ export {
   connectionsView, 
   depthGraphView, 
   subfolderView, 
+  folderView,
   coreViews 
 } from './coreViews';
 export type { 
