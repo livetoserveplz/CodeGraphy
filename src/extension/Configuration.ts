@@ -89,7 +89,7 @@ export class Configuration {
    * @default ['**\/*']
    */
   get include(): string[] {
-    return this.config.get<string[]>('include', ['**/*']);
+    return this.config.get<string[]>('include', ['**/*']) ?? ['**/*'];
   }
 
   /**
@@ -97,7 +97,7 @@ export class Configuration {
    * @default DEFAULT_EXCLUDE_PATTERNS
    */
   get exclude(): string[] {
-    return this.config.get<string[]>('exclude', [...DEFAULT_EXCLUDE_PATTERNS]);
+    return this.config.get<string[]>('exclude', [...DEFAULT_EXCLUDE_PATTERNS]) ?? [...DEFAULT_EXCLUDE_PATTERNS];
   }
 
   /**
@@ -130,7 +130,7 @@ export class Configuration {
    * @default []
    */
   get plugins(): string[] {
-    return this.config.get<string[]>('plugins', []);
+    return this.config.get<string[]>('plugins', []) ?? [];
   }
 
   /**
@@ -140,7 +140,7 @@ export class Configuration {
    * @default {}
    */
   get fileColors(): Record<string, string> {
-    return this.config.get<Record<string, string>>('fileColors', {});
+    return this.config.get<Record<string, string>>('fileColors', {}) ?? {};
   }
 
   /**
