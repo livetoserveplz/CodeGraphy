@@ -194,6 +194,10 @@ Enable community plugins:
 
 **Goal:** Let AI explain what the graph shows.
 
+**Active RFCs:**
+- [RFC: Extended Plugin Types](./RFC-EXTENDED-PLUGIN-TYPES.md) (#56)
+- [RFC: AI Agent Graph API](./RFC-AI-AGENT-GRAPH-API.md) (#57)
+
 ### 8.1: Natural Language Queries
 
 > "What does the auth module depend on?"
