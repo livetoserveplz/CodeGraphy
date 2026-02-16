@@ -21,6 +21,8 @@ interface NodeTooltipProps {
   plugin?: string;
   /** Number of times this file has been visited/opened */
   visits?: number;
+  /** Line coverage percentage from LCOV */
+  coveragePercent?: number;
   /** Position to show tooltip */
   position: { x: number; y: number };
   /** Whether tooltip is visible */
@@ -66,6 +68,7 @@ export function NodeTooltip({
   outgoingCount,
   plugin,
   visits,
+  coveragePercent,
   position,
   visible,
 }: NodeTooltipProps): React.ReactElement | null {
@@ -160,6 +163,16 @@ export function NodeTooltip({
             {visits ?? 0}
           </span>
         </div>
+
+        {/* Coverage */}
+        {coveragePercent !== undefined && (
+          <div className="flex justify-between gap-4">
+            <span>Coverage:</span>
+            <span className="text-[var(--vscode-editorHoverWidget-foreground,#cccccc)]">
+              {coveragePercent.toFixed(1)}%
+            </span>
+          </div>
+        )}
 
         {/* Plugin */}
         {plugin && (

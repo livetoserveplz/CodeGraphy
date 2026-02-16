@@ -113,6 +113,14 @@ const MIN_NODE_SIZE = 10;
 const MAX_NODE_SIZE = 40;
 const DEFAULT_NODE_SIZE = 16;
 
+function getCoverageBandColor(coveragePercent: number | undefined): string {
+  if (coveragePercent === undefined) return '#6b7280'; // gray (no coverage data)
+  if (coveragePercent >= 80) return '#22c55e'; // green
+  if (coveragePercent >= 50) return '#eab308'; // yellow
+  if (coveragePercent > 0) return '#f97316'; // orange
+  return '#ef4444'; // red
+}
+
 /**
  * Calculate node sizes for all nodes based on the sizing mode.
  * Returns a map of node ID to size.
@@ -242,9 +250,16 @@ function getDepthSizeMultiplier(depthLevel: number | undefined): number {
 /**
  * Convert IGraphNode to Vis Network node format
  */
-function toVisNode(node: IGraphNode, isFavorite: boolean, size: number = DEFAULT_NODE_SIZE, theme: ThemeKind = 'dark') {
+function toVisNode(
+  node: IGraphNode,
+  isFavorite: boolean,
+  size: number = DEFAULT_NODE_SIZE,
+  theme: ThemeKind = 'dark',
+  showCoverageOverlay = false
+) {
   const isLight = theme === 'light';
-  const nodeColor = isLight ? adjustColorForLightTheme(node.color) : node.color;
+  const baseColor = showCoverageOverlay ? getCoverageBandColor(node.coveragePercent) : node.color;
+  const nodeColor = isLight ? adjustColorForLightTheme(baseColor) : baseColor;
   const borderColor = isFavorite ? FAVORITE_BORDER_COLOR : nodeColor;
   const textColor = isLight ? '#1e1e1e' : '#e2e8f0';
   
@@ -587,12 +602,14 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark', bid
   const dataRef = useRef(data);
   const favoritesRef = useRef(favorites);
   const bidirectionalModeRef = useRef(bidirectionalMode);
+  const showCoverageOverlayRef = useRef(false);
   
   // Selection state
   const [selectedNodes, setSelectedNodes] = useState<string[]>([]);
   const [isBackgroundContext, setIsBackgroundContext] = useState(false);
   const selectedNodesRef = useRef(selectedNodes);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
+  const [showCoverageOverlay] = useState(false);
   
   // Context menu target (set synchronously on right-click)
   const contextTargetRef = useRef<string[]>([]);
@@ -613,6 +630,7 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark', bid
   dataRef.current = data;
   favoritesRef.current = favorites;
   bidirectionalModeRef.current = bidirectionalMode;
+  showCoverageOverlayRef.current = showCoverageOverlay;
   selectedNodesRef.current = selectedNodes;
   themeRef.current = theme;
 
@@ -760,7 +778,8 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark', bid
                   node, 
                   favoritesRef.current.has(node.id), 
                   nodeSizes.get(node.id), 
-                  themeRef.current
+                  themeRef.current,
+                  showCoverageOverlayRef.current
                 );
                 nodesRef.current?.update(visNode);
               });
@@ -888,7 +907,7 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark', bid
 
     // Create datasets
     const nodes = new DataSet(initialData.nodes.map(n => 
-      toVisNode(n, currentFavorites.has(n.id), nodeSizes.get(n.id), themeRef.current)
+      toVisNode(n, currentFavorites.has(n.id), nodeSizes.get(n.id), themeRef.current, showCoverageOverlayRef.current)
     ));
     const processedEdges = processEdges(initialData.edges, currentMode);
     const edges = new DataSet(processedEdges.map(toVisEdge));
@@ -1015,7 +1034,7 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark', bid
     });
 
     data.nodes.forEach((node) => {
-      const visNode = toVisNode(node, currentFavorites.has(node.id), nodeSizes.get(node.id), themeRef.current);
+      const visNode = toVisNode(node, currentFavorites.has(node.id), nodeSizes.get(node.id), themeRef.current, showCoverageOverlay);
       if (currentNodeIds.has(node.id)) {
         nodesRef.current?.update(visNode);
       } else {
@@ -1041,7 +1060,7 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark', bid
         edgesRef.current?.add(toVisEdge(edge));
       }
     });
-  }, [data]);
+  }, [data, showCoverageOverlay]);
 
   /**
    * Update node styling when favorites change
@@ -1057,10 +1076,10 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark', bid
     );
     
     data.nodes.forEach((node) => {
-      const visNode = toVisNode(node, favorites.has(node.id), nodeSizes.get(node.id), theme);
+      const visNode = toVisNode(node, favorites.has(node.id), nodeSizes.get(node.id), theme, showCoverageOverlay);
       nodesRef.current?.update(visNode);
     });
-  }, [favorites, data.nodes, data.edges, data.nodeSizeMode, theme]);
+  }, [favorites, data.nodes, data.edges, data.nodeSizeMode, theme, showCoverageOverlay]);
 
   /**
    * Handle hover highlighting - dim unconnected nodes
@@ -1098,7 +1117,8 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark', bid
       data.nodes.forEach((node) => {
         const isConnected = connectedNodeIds.has(node.id);
         const isFavorite = favorites.has(node.id);
-        const nodeColor = isLight ? adjustColorForLightTheme(node.color) : node.color;
+        const baseColor = showCoverageOverlay ? getCoverageBandColor(node.coveragePercent) : node.color;
+        const nodeColor = isLight ? adjustColorForLightTheme(baseColor) : baseColor;
         
         nodesDataSet.update({
           id: node.id,
@@ -1149,7 +1169,7 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark', bid
       );
       
       data.nodes.forEach((node) => {
-        const visNode = toVisNode(node, favorites.has(node.id), nodeSizes.get(node.id), themeRef.current);
+        const visNode = toVisNode(node, favorites.has(node.id), nodeSizes.get(node.id), themeRef.current, showCoverageOverlay);
         nodesDataSet.update({
           ...visNode,
           opacity: 1.0,
@@ -1169,7 +1189,7 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark', bid
         });
       });
     }
-  }, [hoveredNode, data, favorites, theme]);
+  }, [hoveredNode, data, favorites, theme, showCoverageOverlay]);
 
   /**
    * Update edges when bidirectional mode changes
@@ -1303,7 +1323,8 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark', bid
           tabIndex={0}
         />
       </ContextMenuTrigger>
-      
+
+
       <ContextMenuContent className="w-64">
         {isBackgroundContext ? (
           // Background context menu
@@ -1393,6 +1414,7 @@ export default function Graph({ data, favorites = new Set(), theme = 'dark', bid
         outgoingCount={tooltipData.info?.outgoingCount ?? 0}
         plugin={tooltipData.info?.plugin}
         visits={tooltipData.info?.visits}
+        coveragePercent={tooltipData.info?.coveragePercent}
         position={tooltipData.position}
         visible={tooltipData.visible}
       />

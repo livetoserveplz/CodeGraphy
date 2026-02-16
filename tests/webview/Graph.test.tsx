@@ -83,6 +83,7 @@ describe('Graph', () => {
     const { container } = render(<Graph data={dataWithPositions} />);
     expect(container.querySelector('div')).toBeInTheDocument();
   });
+
 });
 
 describe('Graph Messages', () => {

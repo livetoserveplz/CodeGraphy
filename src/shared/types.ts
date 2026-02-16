@@ -139,6 +139,11 @@ export interface IGraphNode {
    * Used for visual styling (opacity, size) in depth graph view.
    */
   depthLevel?: number;
+
+  /**
+   * Line coverage percentage from LCOV (0-100).
+   */
+  coveragePercent?: number;
 }
 
 /**
@@ -339,6 +344,8 @@ export interface IFileInfo {
   outgoingCount: number;
   /** Number of times this file has been viewed/selected */
   visits: number;
+  /** Line coverage percentage from LCOV (0-100) */
+  coveragePercent?: number;
 }
 
 // ============================================================================

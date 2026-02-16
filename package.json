@@ -212,6 +212,11 @@
           "default": "connections",
           "description": "What determines the size of nodes in the graph."
         },
+        "codegraphy.lcovPath": {
+          "type": "string",
+          "default": "coverage/lcov.info",
+          "description": "Relative path to LCOV report used for coverage overlay (e.g. coverage/lcov.info)."
+        },
         "codegraphy.physics.gravitationalConstant": {
           "type": "number",
           "default": -50,

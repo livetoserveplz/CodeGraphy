@@ -1107,6 +1107,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
 
       // Get visit count
       const visits = this._getVisitCount(filePath);
+      const coveragePercent = this._graphData.nodes.find((n) => n.id === filePath)?.coveragePercent;
 
       this._sendMessage({
         type: 'FILE_INFO',
@@ -1118,6 +1119,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
           outgoingCount,
           plugin,
           visits,
+          coveragePercent,
         },
       });
     } catch (error) {
