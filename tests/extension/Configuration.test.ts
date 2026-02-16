@@ -35,6 +35,18 @@ describe('Configuration', () => {
   });
 
   describe('default values', () => {
+    it('should fall back to safe defaults when configuration getter returns undefined', () => {
+      vi.mocked(vscode.workspace.getConfiguration).mockReturnValue({
+        get: vi.fn(() => undefined),
+      } as unknown as vscode.WorkspaceConfiguration);
+
+      const config = new Configuration();
+      expect(config.include).toEqual(['**/*']);
+      expect(config.exclude).toEqual(DEFAULT_EXCLUDE_PATTERNS);
+      expect(config.plugins).toEqual([]);
+      expect(config.fileColors).toEqual({});
+    });
+
     it('should return default maxFiles of 100', () => {
       const config = new Configuration();
       expect(config.maxFiles).toBe(100);
