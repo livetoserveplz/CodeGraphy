@@ -44,6 +44,8 @@ export interface ICodeGraphyConfig {
   plugins: string[];
   /** User-defined colors for file extensions (overrides plugin/generated colors) */
   fileColors: Record<string, string>;
+  /** Path to lcov coverage file (workspace-relative or absolute) */
+  lcovPath: string;
   /** What determines node size in the graph */
   nodeSizeBy: NodeSizeMode;
 }
@@ -144,6 +146,15 @@ export class Configuration {
   }
 
   /**
+   * Path to lcov coverage file.
+   * Can be workspace-relative (recommended) or absolute path.
+   * @default 'coverage/lcov.info'
+   */
+  get lcovPath(): string {
+    return this.config.get<string>('lcovPath', 'coverage/lcov.info');
+  }
+
+  /**
    * What determines node size in the graph.
    * Options: 'connections', 'file-size', 'access-count', 'uniform'
    * @default 'connections'
@@ -178,6 +189,7 @@ export class Configuration {
       bidirectionalEdges: this.bidirectionalEdges,
       plugins: this.plugins,
       fileColors: this.fileColors,
+      lcovPath: this.lcovPath,
       nodeSizeBy: this.nodeSizeBy,
     };
   }

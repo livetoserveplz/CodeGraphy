@@ -24,6 +24,7 @@ describe('Configuration', () => {
       showOrphans: true,
       plugins: [],
       fileColors: {},
+      lcovPath: 'coverage/lcov.info',
     };
 
     // Setup mock to return values from mockConfig
@@ -63,6 +64,19 @@ describe('Configuration', () => {
     it('should return default plugins as empty array', () => {
       const config = new Configuration();
       expect(config.plugins).toEqual([]);
+    });
+  });
+
+  describe('coverage settings', () => {
+    it('should return default lcov path', () => {
+      const config = new Configuration();
+      expect(config.lcovPath).toBe('coverage/lcov.info');
+    });
+
+    it('should return custom lcov path', () => {
+      mockConfig.lcovPath = 'artifacts/lcov.info';
+      const config = new Configuration();
+      expect(config.lcovPath).toBe('artifacts/lcov.info');
     });
   });
 
@@ -119,6 +133,7 @@ describe('Configuration', () => {
         fileColors: {},
         bidirectionalEdges: 'separate',
         nodeSizeBy: 'connections',
+        lcovPath: 'coverage/lcov.info',
       });
     });
 

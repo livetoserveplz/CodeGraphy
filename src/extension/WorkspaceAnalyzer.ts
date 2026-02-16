@@ -6,6 +6,7 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
+import * as fs from 'fs/promises';
 import { PluginRegistry, IConnection } from '../core/plugins';
 import { FileDiscovery, IDiscoveredFile } from '../core/discovery';
 import { Configuration } from './Configuration';
@@ -15,6 +16,7 @@ import { createPythonPlugin } from '../plugins/python';
 import { createCSharpPlugin } from '../plugins/csharp';
 import { ColorPaletteManager } from '../core/colors';
 import { IGraphData, IGraphNode, IGraphEdge } from '../shared/types';
+import { parseLcovCoverage } from './LcovParser';
 
 /**
  * Cache entry for a single file's analysis.
@@ -161,8 +163,11 @@ export class WorkspaceAnalyzer {
     // Analyze files (with caching)
     const fileConnections = await this._analyzeFiles(discoveryResult.files, workspaceRoot);
 
+    // Load test coverage data from LCOV (best effort)
+    const coverageByFile = await this._loadCoverageMap(workspaceRoot, config.lcovPath);
+
     // Build graph data
-    const graphData = this._buildGraphData(fileConnections, workspaceRoot, config.showOrphans);
+    const graphData = this._buildGraphData(fileConnections, workspaceRoot, config.showOrphans, coverageByFile);
 
     // Save cache
     this._saveCache();
@@ -243,7 +248,8 @@ export class WorkspaceAnalyzer {
   private _buildGraphData(
     fileConnections: Map<string, IConnection[]>,
     workspaceRoot: string,
-    showOrphans: boolean
+    showOrphans: boolean,
+    coverageByFile: Map<string, number>
   ): IGraphData {
     const nodes: IGraphNode[] = [];
     const edges: IGraphEdge[] = [];
@@ -296,6 +302,7 @@ export class WorkspaceAnalyzer {
         color,
         fileSize: cached?.size,
         accessCount: visitCounts[filePath] ?? 0,
+        coveragePercent: coverageByFile.get(filePath),
       });
     }
 
@@ -306,6 +313,22 @@ export class WorkspaceAnalyzer {
     );
 
     return { nodes, edges: filteredEdges, nodeSizeMode };
+  }
+
+  /**
+   * Loads coverage percentages from LCOV file (best effort).
+   */
+  private async _loadCoverageMap(workspaceRoot: string, lcovPath: string): Promise<Map<string, number>> {
+    try {
+      const lcovAbsolute = path.isAbsolute(lcovPath)
+        ? lcovPath
+        : path.join(workspaceRoot, lcovPath);
+
+      const lcovContent = await fs.readFile(lcovAbsolute, 'utf-8');
+      return parseLcovCoverage(lcovContent, workspaceRoot);
+    } catch {
+      return new Map<string, number>();
+    }
   }
 
   /**
