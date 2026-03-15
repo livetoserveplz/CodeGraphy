@@ -14,49 +14,23 @@ import { createGDScriptPlugin } from '../../../plugin-godot/src';
 import { createPythonPlugin } from '../../../plugin-python/src';
 import { createCSharpPlugin } from '../../../plugin-csharp/src';
 import { createMarkdownPlugin } from '../../../plugin-markdown/src';
-import { IGraphData, IGraphNode, IGraphEdge, DEFAULT_NODE_COLOR, IPluginStatus, IPluginRuleStatus } from '../shared/types';
+import { IGraphData, IPluginStatus } from '../shared/types';
 import { EventBus } from '../core/plugins/EventBus';
 import { DEFAULT_EXCLUDE_PATTERNS } from './Configuration';
-
-/**
- * Cache entry for a single file's analysis.
- */
-interface ICachedFile {
-  /** File modification time when cached */
-  mtime: number;
-  /** Detected connections */
-  connections: IConnection[];
-  /** File size in bytes */
-  size?: number;
-}
-
-/**
- * Analysis cache stored in workspace state.
- */
-interface IAnalysisCache {
-  /** Cache format version */
-  version: string;
-  /** Cached file data */
-  files: Record<string, ICachedFile>;
-}
-
-const CACHE_KEY = 'codegraphy.analysisCache';
-const CACHE_VERSION = '1.9.0'; // Bumped for rule-based filtering support
+import { throwIfWorkspaceAnalysisAborted } from './workspaceAnalyzerAbort';
+import {
+  createEmptyWorkspaceAnalysisCache,
+  IWorkspaceAnalysisCache,
+  loadWorkspaceAnalysisCache,
+  saveWorkspaceAnalysisCache,
+  WORKSPACE_ANALYSIS_CACHE_KEY,
+} from './workspaceAnalysisCache';
+import { buildWorkspaceGraphData } from './workspaceGraphData';
+import { analyzeWorkspaceFiles } from './workspaceFileAnalysis';
+import { buildWorkspacePluginStatuses } from './workspacePluginStatuses';
 
 /** Storage key for file visit counts in workspace state (shared with GraphViewProvider) */
 const VISITS_KEY = 'codegraphy.fileVisits';
-
-function createAbortError(): Error {
-  const error = new Error('Analysis aborted');
-  error.name = 'AbortError';
-  return error;
-}
-
-function throwIfAborted(signal?: AbortSignal): void {
-  if (signal?.aborted) {
-    throw createAbortError();
-  }
-}
 
 /**
  * Orchestrates workspace analysis.
@@ -79,7 +53,7 @@ export class WorkspaceAnalyzer {
   private readonly _registry: PluginRegistry;
   private readonly _discovery: FileDiscovery;
   private readonly _context: vscode.ExtensionContext;
-  private _cache: IAnalysisCache;
+  private _cache: IWorkspaceAnalysisCache;
   private _lastFileConnections: Map<string, IConnection[]> = new Map();
   private _lastDiscoveredFiles: IDiscoveredFile[] = [];
   private _lastWorkspaceRoot: string = '';
@@ -90,7 +64,9 @@ export class WorkspaceAnalyzer {
     this._config = new Configuration();
     this._registry = new PluginRegistry();
     this._discovery = new FileDiscovery();
-    this._cache = this._loadCache();
+    this._cache = loadWorkspaceAnalysisCache(
+      this._context.workspaceState.get<IWorkspaceAnalysisCache>(WORKSPACE_ANALYSIS_CACHE_KEY)
+    );
   }
 
   /**
@@ -163,7 +139,7 @@ export class WorkspaceAnalyzer {
     disabledPlugins: Set<string> = new Set(),
     signal?: AbortSignal
   ): Promise<IGraphData> {
-    throwIfAborted(signal);
+    throwIfWorkspaceAnalysisAborted(signal);
 
     const workspaceRoot = this._getWorkspaceRoot();
     if (!workspaceRoot) {
@@ -191,7 +167,7 @@ export class WorkspaceAnalyzer {
       // Don't filter by extensions - we want all files as nodes
     });
 
-    throwIfAborted(signal);
+    throwIfWorkspaceAnalysisAborted(signal);
 
     if (discoveryResult.limitReached) {
       vscode.window.showWarningMessage(
@@ -211,7 +187,7 @@ export class WorkspaceAnalyzer {
     // Analyze files (with caching)
     const fileConnections = await this._analyzeFiles(discoveryResult.files, workspaceRoot, signal);
 
-    throwIfAborted(signal);
+    throwIfWorkspaceAnalysisAborted(signal);
 
     // Store results for instant rebuilding via rebuildGraph()
     this._lastFileConnections = fileConnections;
@@ -222,7 +198,7 @@ export class WorkspaceAnalyzer {
     const graphData = this._buildGraphData(fileConnections, workspaceRoot, config.showOrphans, disabledRules, disabledPlugins);
 
     // Save cache
-    this._saveCache();
+    saveWorkspaceAnalysisCache(this._context.workspaceState.update.bind(this._context.workspaceState), this._cache);
 
     console.log(`[CodeGraphy] Graph built: ${graphData.nodes.length} nodes, ${graphData.edges.length} edges`);
 
@@ -258,81 +234,15 @@ export class WorkspaceAnalyzer {
    * Computes the status of each registered plugin for the webview's Plugins panel.
    */
   getPluginStatuses(disabledRules: Set<string>, disabledPlugins: Set<string>): IPluginStatus[] {
-    const statuses: IPluginStatus[] = [];
-
-    for (const pluginInfo of this._registry.list()) {
-      const plugin = pluginInfo.plugin;
-
-      // Check if any discovered files match this plugin's extensions
-      const matchingFiles = this._lastDiscoveredFiles.filter((file) => {
-        const ext = path.extname(file.relativePath).toLowerCase();
-        return plugin.supportedExtensions.includes(ext);
-      });
-
-      // Count connections per rule for this plugin
-      const ruleConnectionCounts = new Map<string, number>();
-      let totalConnections = 0;
-
-      for (const [filePath, connections] of this._lastFileConnections) {
-        const filePlugin = this._registry.getPluginForFile(
-          path.join(this._lastWorkspaceRoot, filePath)
-        );
-        if (filePlugin?.id !== plugin.id) {
-          continue;
-        }
-
-        for (const conn of connections) {
-          if (conn.resolvedPath) {
-            totalConnections++;
-            if (conn.ruleId) {
-              ruleConnectionCounts.set(
-                conn.ruleId,
-                (ruleConnectionCounts.get(conn.ruleId) ?? 0) + 1
-              );
-            }
-          }
-        }
-      }
-
-      // Determine plugin status
-      let status: 'active' | 'installed' | 'inactive';
-      if (matchingFiles.length === 0) {
-        status = 'inactive';
-      } else if (totalConnections > 0) {
-        status = 'active';
-      } else {
-        status = 'installed';
-      }
-
-      // Build per-rule statuses
-      const rules: IPluginRuleStatus[] = (plugin.rules ?? []).map((rule) => {
-        const qualifiedId = `${plugin.id}:${rule.id}`;
-        return {
-          id: rule.id,
-          qualifiedId,
-          name: rule.name,
-          description: rule.description,
-          enabled: !disabledRules.has(qualifiedId),
-          connectionCount: ruleConnectionCounts.get(rule.id) ?? 0,
-        };
-      });
-
-      statuses.push({
-        id: plugin.id,
-        name: plugin.name,
-        version: plugin.version,
-        supportedExtensions: plugin.supportedExtensions,
-        status,
-        enabled: !disabledPlugins.has(plugin.id),
-        connectionCount: totalConnections,
-        rules,
-      });
-    }
-
-    // Sort by plugin name
-    statuses.sort((sa, sb) => sa.name.localeCompare(sb.name));
-
-    return statuses;
+    return buildWorkspacePluginStatuses({
+      disabledPlugins,
+      disabledRules,
+      discoveredFiles: this._lastDiscoveredFiles,
+      fileConnections: this._lastFileConnections,
+      pluginInfos: this._registry.list(),
+      workspaceRoot: this._lastWorkspaceRoot,
+      getPluginForFile: (absolutePath) => this._registry.getPluginForFile(absolutePath),
+    });
   }
 
   /**
@@ -349,8 +259,8 @@ export class WorkspaceAnalyzer {
    * Clears the analysis cache.
    */
   clearCache(): void {
-    this._cache = { version: CACHE_VERSION, files: {} };
-    this._saveCache();
+    this._cache = createEmptyWorkspaceAnalysisCache();
+    saveWorkspaceAnalysisCache(this._context.workspaceState.update.bind(this._context.workspaceState), this._cache);
     console.log('[CodeGraphy] Cache cleared');
   }
 
@@ -370,17 +280,18 @@ export class WorkspaceAnalyzer {
     workspaceRoot: string,
     signal?: AbortSignal
   ): Promise<void> {
-    throwIfAborted(signal);
+    throwIfWorkspaceAnalysisAborted(signal);
 
-    const contentByRelativePath = new Map<string, string>();
-    const getFileContent = async (file: IDiscoveredFile): Promise<string> => {
+    const contentByRelativePath = new Map<string, Promise<string>>();
+    const getFileContent = (file: IDiscoveredFile): Promise<string> => {
       const cached = contentByRelativePath.get(file.relativePath);
-      if (cached !== undefined) {
+      if (cached) {
         return cached;
       }
-      const content = await this._discovery.readContent(file);
-      contentByRelativePath.set(file.relativePath, content);
-      return content;
+
+      const contentPromise = this._discovery.readContent(file);
+      contentByRelativePath.set(file.relativePath, contentPromise);
+      return contentPromise;
     };
 
     const v2Files = await Promise.all(files.map(async (file) => ({
@@ -402,57 +313,21 @@ export class WorkspaceAnalyzer {
     workspaceRoot: string,
     signal?: AbortSignal
   ): Promise<Map<string, IConnection[]>> {
-    throwIfAborted(signal);
+    const result = await analyzeWorkspaceFiles({
+      analyzeFile: (absolutePath, content, rootPath) => this._registry.analyzeFile(absolutePath, content, rootPath),
+      cache: this._cache,
+      emitFileProcessed: this._eventBus
+        ? (payload) => this._eventBus?.emit('analysis:fileProcessed', payload)
+        : undefined,
+      files,
+      getFileStat: (filePath) => this._getFileStat(filePath),
+      readContent: (file) => this._discovery.readContent(file),
+      signal,
+      workspaceRoot,
+    });
 
-    const results = new Map<string, IConnection[]>();
-    let cacheHits = 0;
-    let cacheMisses = 0;
-
-    for (const file of files) {
-      throwIfAborted(signal);
-
-      // Check cache
-      const cached = this._cache.files[file.relativePath];
-      const stat = await this._getFileStat(file.absolutePath);
-
-      if (cached && cached.mtime === stat?.mtime) {
-        // Cache hit - but update size if missing (migration from old cache)
-        if (cached.size === undefined && stat?.size !== undefined) {
-          cached.size = stat.size;
-        }
-        results.set(file.relativePath, cached.connections);
-        cacheHits++;
-        continue;
-      }
-
-      // Cache miss - analyze file
-      cacheMisses++;
-      throwIfAborted(signal);
-      const content = await this._discovery.readContent(file);
-      throwIfAborted(signal);
-      const connections = await this._registry.analyzeFile(
-        file.absolutePath,
-        content,
-        workspaceRoot
-      );
-
-      results.set(file.relativePath, connections);
-
-      this._eventBus?.emit('analysis:fileProcessed', {
-        filePath: file.relativePath,
-        connections: connections.map(conn => ({ specifier: conn.specifier, resolvedPath: conn.resolvedPath })),
-      });
-
-      // Update cache with connections and size
-      this._cache.files[file.relativePath] = {
-        mtime: stat?.mtime ?? 0,
-        connections,
-        size: stat?.size,
-      };
-    }
-
-    console.log(`[CodeGraphy] Analysis: ${cacheHits} cache hits, ${cacheMisses} misses`);
-    return results;
+    console.log(`[CodeGraphy] Analysis: ${result.cacheHits} cache hits, ${result.cacheMisses} misses`);
+    return result.fileConnections;
   }
 
   /**
@@ -465,93 +340,18 @@ export class WorkspaceAnalyzer {
     disabledRules: Set<string> = new Set(),
     disabledPlugins: Set<string> = new Set()
   ): IGraphData {
-    const nodes: IGraphNode[] = [];
-    const edges: IGraphEdge[] = [];
-    const nodeIds = new Set<string>();
-    const connectedIds = new Set<string>();
-    const edgeMap = new Map<string, IGraphEdge>();
-
-    // Get visit counts from workspace state (for access-count mode)
     const visitCounts = this._context.workspaceState.get<Record<string, number>>(VISITS_KEY) ?? {};
 
-    // First pass: create nodes and track connections
-    for (const [filePath, connections] of fileConnections) {
-      nodeIds.add(filePath);
-
-      // Determine which plugin handles this file (once per file for efficiency)
-      const plugin = this._registry.getPluginForFile(path.join(workspaceRoot, filePath));
-
-      // If the entire plugin is disabled, skip all connections for this file
-      if (plugin && disabledPlugins.has(plugin.id)) {
-        continue;
-      }
-
-      for (const conn of connections) {
-        // If this connection has a ruleId, check if the qualified rule is disabled
-        if (plugin && conn.ruleId) {
-          const qualifiedId = `${plugin.id}:${conn.ruleId}`;
-          if (disabledRules.has(qualifiedId)) {
-            continue;
-          }
-        }
-
-        if (conn.resolvedPath) {
-          const targetRelative = path.relative(workspaceRoot, conn.resolvedPath);
-
-          // Only create edge if target is in our discovered files
-          if (fileConnections.has(targetRelative)) {
-            connectedIds.add(filePath);
-            connectedIds.add(targetRelative);
-
-            // Deduplicate: a file may import the same target via multiple
-            // mechanisms (e.g. extends path + class_name usage)
-            const edgeId = `${filePath}->${targetRelative}`;
-            const qualifiedRuleId = plugin && conn.ruleId ? `${plugin.id}:${conn.ruleId}` : undefined;
-            const existing = edgeMap.get(edgeId);
-            if (!existing) {
-              const edge: IGraphEdge = {
-                id: edgeId,
-                from: filePath,
-                to: targetRelative,
-              };
-              if (qualifiedRuleId) edge.ruleIds = [qualifiedRuleId];
-              edges.push(edge);
-              edgeMap.set(edgeId, edge);
-            } else if (qualifiedRuleId && (!existing.ruleIds || !existing.ruleIds.includes(qualifiedRuleId))) {
-              if (!existing.ruleIds) existing.ruleIds = [];
-              existing.ruleIds.push(qualifiedRuleId);
-            }
-          }
-        }
-      }
-    }
-
-    // Second pass: create nodes
-    for (const filePath of nodeIds) {
-      // Skip orphans if configured
-      if (!showOrphans && !connectedIds.has(filePath)) {
-        continue;
-      }
-
-      const color = DEFAULT_NODE_COLOR;
-      const cached = this._cache.files[filePath];
-
-      nodes.push({
-        id: filePath,
-        label: path.basename(filePath),
-        color,
-        fileSize: cached?.size,
-        accessCount: visitCounts[filePath] ?? 0,
-      });
-    }
-
-    // Filter edges to only include nodes that exist
-    const nodeIdSet = new Set(nodes.map((n) => n.id));
-    const filteredEdges = edges.filter(
-      (e) => nodeIdSet.has(e.from) && nodeIdSet.has(e.to)
-    );
-
-    return { nodes, edges: filteredEdges };
+    return buildWorkspaceGraphData({
+      cacheFiles: this._cache.files,
+      disabledPlugins,
+      disabledRules,
+      fileConnections,
+      showOrphans,
+      visitCounts,
+      workspaceRoot,
+      getPluginForFile: (absolutePath) => this._registry.getPluginForFile(absolutePath),
+    });
   }
 
 
@@ -574,24 +374,4 @@ export class WorkspaceAnalyzer {
     }
   }
 
-  /**
-   * Loads the analysis cache from workspace state.
-   */
-  private _loadCache(): IAnalysisCache {
-    const cached = this._context.workspaceState.get<IAnalysisCache>(CACHE_KEY);
-    
-    if (cached && cached.version === CACHE_VERSION) {
-      console.log(`[CodeGraphy] Loaded cache: ${Object.keys(cached.files).length} files`);
-      return cached;
-    }
-
-    return { version: CACHE_VERSION, files: {} };
-  }
-
-  /**
-   * Saves the analysis cache to workspace state.
-   */
-  private _saveCache(): void {
-    this._context.workspaceState.update(CACHE_KEY, this._cache);
-  }
 }
