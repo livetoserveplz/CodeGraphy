@@ -12,7 +12,11 @@ import { usePluginManager } from './hooks/usePluginManager';
 import { ExtensionToWebviewMessage } from '../shared/types';
 import { postMessage } from './lib/vscodeApi';
 import { useGraphStore, graphStore } from './store';
-import type { PluginInjectPayload } from './hooks/usePluginManager';
+import {
+  normalizePluginInjectPayload,
+  parsePluginScopedMessage,
+  resolvePluginModuleActivator,
+} from './lib/pluginMessageParser';
 
 export default function App(): React.ReactElement {
   const { pluginHost, injectPluginAssets } = usePluginManager();
@@ -51,25 +55,16 @@ export default function App(): React.ReactElement {
       }
 
       if (raw.type === 'PLUGIN_WEBVIEW_INJECT') {
-        const payload = raw.payload as PluginInjectPayload;
-        if (payload && typeof payload.pluginId === 'string') {
-          void injectPluginAssets({
-            pluginId: payload.pluginId,
-            scripts: Array.isArray(payload.scripts) ? payload.scripts : [],
-            styles: Array.isArray(payload.styles) ? payload.styles : [],
-          });
+        const payload = normalizePluginInjectPayload(raw.payload);
+        if (payload) {
+          void injectPluginAssets(payload);
         }
         return;
       }
 
-      if (raw.type.startsWith('plugin:')) {
-        const [, pluginId, ...typeParts] = raw.type.split(':');
-        if (pluginId && typeParts.length > 0) {
-          pluginHost.deliverMessage(pluginId, {
-            type: typeParts.join(':'),
-            data: raw.data,
-          });
-        }
+      const parsedPlugin = parsePluginScopedMessage(raw.type, raw.data);
+      if (parsedPlugin) {
+        resolvePluginModuleActivator(parsedPlugin, pluginHost);
         return;
       }
 

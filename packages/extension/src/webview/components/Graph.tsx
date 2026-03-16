@@ -59,6 +59,14 @@ import { exportAsJson } from '../lib/export/exportJson';
 import { exportAsMarkdown } from '../lib/export/exportMarkdown';
 import { useGraphStore, graphStore } from '../store';
 import { WebviewPluginHost } from '../pluginHost';
+import {
+  sizeByUniform,
+  sizeByConnections,
+  sizeByAccessCount,
+  sizeByFileSize,
+  DEFAULT_NODE_SIZE,
+} from '../lib/sizingModes';
+import { seedTimelinePositions } from '../lib/timelinePositionSeeding';
 
 /** Yellow color for favorites */
 const FAVORITE_BORDER_COLOR = '#EAB308';
@@ -68,10 +76,6 @@ const RIGHT_CLICK_DRAG_THRESHOLD_PX = 6;
 const RIGHT_CLICK_FALLBACK_DELAY_MS = 40;
 const NODE_DOUBLE_CLICK_THRESHOLD_MS = 450;
 
-/** Minimum and maximum node sizes */
-const MIN_NODE_SIZE = 10;
-const MAX_NODE_SIZE = 40;
-const DEFAULT_NODE_SIZE = 16;
 type GraphCursorStyle = 'default' | 'pointer';
 
 interface GraphProps {
@@ -163,67 +167,11 @@ function calculateNodeSizes(
   edges: { from: string; to: string }[],
   mode: NodeSizeMode
 ): Map<string, number> {
-  const sizes = new Map<string, number>();
-
-  if (mode === 'uniform') {
-    for (const node of nodes) sizes.set(node.id, DEFAULT_NODE_SIZE);
-    return sizes;
-  }
-
-  if (mode === 'connections') {
-    const counts = new Map<string, number>();
-    for (const node of nodes) counts.set(node.id, 0);
-    for (const edge of edges) {
-      counts.set(edge.from, (counts.get(edge.from) ?? 0) + 1);
-      counts.set(edge.to, (counts.get(edge.to) ?? 0) + 1);
-    }
-    const vals = Array.from(counts.values());
-    const min = Math.min(...vals, 0);
-    const max = Math.max(...vals, 1);
-    const range = max - min || 1;
-    for (const node of nodes) {
-      const count = counts.get(node.id) ?? 0;
-      sizes.set(node.id, MIN_NODE_SIZE + ((count - min) / range) * (MAX_NODE_SIZE - MIN_NODE_SIZE));
-    }
-    return sizes;
-  }
-
-  if (mode === 'access-count') {
-    const vals = nodes.map(n => n.accessCount ?? 0);
-    const min = Math.min(...vals, 0);
-    const max = Math.max(...vals, 1);
-    const range = max - min || 1;
-    for (const node of nodes) {
-      const accessCount = node.accessCount ?? 0;
-      sizes.set(node.id, MIN_NODE_SIZE + ((accessCount - min) / range) * (MAX_NODE_SIZE - MIN_NODE_SIZE));
-    }
-    return sizes;
-  }
-
-  if (mode === 'file-size') {
-    const fileSizes = nodes.map(n => n.fileSize ?? 0).filter(s => s > 0);
-    if (fileSizes.length === 0) {
-      for (const node of nodes) sizes.set(node.id, DEFAULT_NODE_SIZE);
-      return sizes;
-    }
-    const logSizes = fileSizes.map(s => Math.log10(s + 1));
-    const minLog = Math.min(...logSizes);
-    const maxLog = Math.max(...logSizes);
-    const range = maxLog - minLog || 1;
-    for (const node of nodes) {
-      const fs = node.fileSize ?? 0;
-      if (fs === 0) {
-        sizes.set(node.id, MIN_NODE_SIZE);
-      } else {
-        const logS = Math.log10(fs + 1);
-        sizes.set(node.id, MIN_NODE_SIZE + ((logS - minLog) / range) * (MAX_NODE_SIZE - MIN_NODE_SIZE));
-      }
-    }
-    return sizes;
-  }
-
-  for (const node of nodes) sizes.set(node.id, DEFAULT_NODE_SIZE);
-  return sizes;
+  if (mode === 'uniform') return sizeByUniform(nodes);
+  if (mode === 'connections') return sizeByConnections(nodes, edges);
+  if (mode === 'access-count') return sizeByAccessCount(nodes);
+  if (mode === 'file-size') return sizeByFileSize(nodes);
+  return sizeByUniform(nodes);
 }
 
 function getDepthOpacity(depthLevel: number | undefined): number {
@@ -466,22 +414,7 @@ export default function Graph({
     });
 
     // For truly new nodes during timeline, seed their position near a connected node
-    if (prevPositions && prevPositions.size > 0) {
-      const nodePositionMap = new Map(nodes.map(n => [n.id, n]));
-      for (const node of nodes) {
-        if (node.x === undefined && node.y === undefined) {
-          const edge = data.edges.find(e => e.from === node.id || e.to === node.id);
-          if (edge) {
-            const neighborId = edge.from === node.id ? edge.to : edge.from;
-            const neighbor = nodePositionMap.get(neighborId);
-            if (neighbor?.x !== undefined && neighbor?.y !== undefined) {
-              node.x = neighbor.x + (Math.random() - 0.5) * 40;
-              node.y = neighbor.y + (Math.random() - 0.5) * 40;
-            }
-          }
-        }
-      }
-    }
+    seedTimelinePositions(nodes, data.edges, prevPositions);
 
     const processedEdges = processEdges(data.edges, bidirectionalMode);
     const links: FGLink[] = processedEdges.map(e => ({
