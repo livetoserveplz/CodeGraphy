@@ -46,6 +46,11 @@ import { saveExportedSvg } from './export/saveSvg';
 import { saveExportedJpeg } from './export/saveJpeg';
 import { saveExportedJson } from './export/saveJson';
 import { saveExportedMarkdown } from './export/saveMarkdown';
+import { getGraphViewLocalResourceRoots } from './graphView/resourceRoots';
+import {
+  resolveGraphViewAssetPath,
+  normalizeGraphViewExtensionUri,
+} from './graphView/resources';
 
 /** Default physics settings (user-facing normalized values) */
 const DEFAULT_PHYSICS: IPhysicsSettings = {
@@ -867,38 +872,13 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
    * to webview URIs when possible.
    */
   private _resolveWebviewAssetPath(assetPath: string, pluginId?: string): string {
-    // Already a URI (e.g. https://..., vscode-webview://...)
-    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(assetPath)) {
-      return assetPath;
-    }
-
-    const pluginRoot = pluginId ? this._pluginExtensionUris.get(pluginId) : undefined;
-    const fileUri = path.isAbsolute(assetPath)
-      ? vscode.Uri.file(assetPath)
-      : vscode.Uri.joinPath(pluginRoot ?? this._extensionUri, assetPath);
-
-    const webview = this._view?.webview ?? this._panels[0]?.webview;
-    if (!webview) {
-      return fileUri.toString();
-    }
-
-    const webviewUri = webview.asWebviewUri(fileUri) as unknown;
-    if (typeof webviewUri === 'string') {
-      return webviewUri;
-    }
-    if (
-      webviewUri &&
-      typeof (webviewUri as { toString?: () => string }).toString === 'function'
-    ) {
-      const text = (webviewUri as { toString: () => string }).toString();
-      if (text && text !== '[object Object]') {
-        return text;
-      }
-    }
-
-    // Test mocks may provide plain URI objects without a useful toString().
-    const pathLike = webviewUri as { path?: string; fsPath?: string } | null;
-    return pathLike?.path ?? pathLike?.fsPath ?? String(webviewUri);
+    return resolveGraphViewAssetPath({
+      assetPath,
+      extensionUri: this._extensionUri,
+      pluginExtensionUris: this._pluginExtensionUris,
+      pluginId,
+      webview: this._view?.webview ?? this._panels[0]?.webview,
+    });
   }
 
   /**
@@ -906,24 +886,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
    * Includes CodeGraphy and any externally-registered plugin extension roots.
    */
   private _getLocalResourceRoots(): vscode.Uri[] {
-    const roots = new Map<string, vscode.Uri>();
-    roots.set(this._uriKey(this._extensionUri), this._extensionUri);
-    for (const uri of this._pluginExtensionUris.values()) {
-      roots.set(this._uriKey(uri), uri);
-    }
-    // Add workspace folders so .codegraphy/assets/ images can be served
-    for (const folder of vscode.workspace.workspaceFolders ?? []) {
-      roots.set(this._uriKey(folder.uri), folder.uri);
-    }
-    return [...roots.values()];
-  }
-
-  /**
-   * Stable key helper for URI map de-duplication across real VS Code URIs and test mocks.
-   */
-  private _uriKey(uri: vscode.Uri): string {
-    const candidate = uri as unknown as { fsPath?: string; path?: string; toString(): string };
-    return candidate.fsPath ?? candidate.path ?? candidate.toString();
+    return getGraphViewLocalResourceRoots(this._extensionUri, this._pluginExtensionUris);
   }
 
   /**
@@ -949,11 +912,7 @@ export class GraphViewProvider implements vscode.WebviewViewProvider {
    * Normalizes an external plugin extension URI from API input.
    */
   private _normalizeExternalExtensionUri(uri: vscode.Uri | string | undefined): vscode.Uri | undefined {
-    if (!uri) return undefined;
-    if (typeof uri === 'string') {
-      return vscode.Uri.file(uri);
-    }
-    return uri;
+    return normalizeGraphViewExtensionUri(uri);
   }
 
   /**
