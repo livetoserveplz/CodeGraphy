@@ -39,6 +39,11 @@ export const workspace = {
   },
 };
 
+export const extensions = {
+  all: [],
+  getExtension: vi.fn(),
+};
+
 export const ExtensionContext = class {
   subscriptions: { dispose: () => void }[] = [];
   extensionUri = Uri.file('/test/extension');
