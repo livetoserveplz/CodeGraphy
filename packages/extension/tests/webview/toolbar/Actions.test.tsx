@@ -81,7 +81,13 @@ function clickExportItem(label: string) {
 describe('ToolbarActions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    graphStore.setState({ activePanel: 'none' });
+    graphStore.setState({
+      activePanel: 'none',
+      activeViewId: 'codegraphy.connections',
+      depthLimit: 1,
+      maxDepthLimit: null,
+      activeFilePath: null,
+    });
   });
 
   it('renders all four action buttons', () => {
@@ -146,6 +152,23 @@ describe('ToolbarActions', () => {
     const refreshButton = screen.getByTitle('Refresh Graph');
     expect(refreshButton.className).toContain('h-7');
     expect(refreshButton.className).toContain('w-7');
+  });
+
+  it('renders the depth control inline with settings in depth view', () => {
+    graphStore.setState({
+      activeViewId: 'codegraphy.depth-graph',
+      depthLimit: 3,
+      maxDepthLimit: 5,
+      activeFilePath: 'src/app.ts',
+    });
+
+    renderWithProviders();
+
+    const settingsRow = screen.getByTestId('toolbar-settings-row');
+    expect(settingsRow.querySelector('[data-testid="depth-control"]')).toBeTruthy();
+    expect(screen.getByTitle('Settings').closest('[data-testid="toolbar-settings-row"]')).toBe(
+      settingsRow,
+    );
   });
 });
 

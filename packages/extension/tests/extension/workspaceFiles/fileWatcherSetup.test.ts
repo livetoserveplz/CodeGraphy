@@ -191,6 +191,41 @@ describe('registerEditorChangeHandler', () => {
     });
   });
 
+  it('falls back to a visible file editor when the webview becomes active', async () => {
+    const context = makeContext();
+    const provider = makeProvider();
+
+    (vscode.workspace as unknown as { workspaceFolders: unknown[] }).workspaceFolders = [
+      { uri: { fsPath: '/workspace' } },
+    ];
+    (vscode.window as unknown as { visibleTextEditors: unknown[] }).visibleTextEditors = [
+      {
+        document: {
+          uri: { scheme: 'file', fsPath: '/workspace/src/app.ts' },
+        },
+      },
+    ];
+
+    registerEditorChangeHandler(context as unknown as vscode.ExtensionContext, provider as never);
+
+    const mock = vscode.window.onDidChangeActiveTextEditor as unknown as {
+      mock: { calls: unknown[][] };
+    };
+    const listener = mock.mock.calls[0]?.[0] as (editor: undefined) => Promise<void>;
+
+    provider.trackFileVisit.mockClear();
+    provider.setFocusedFile.mockClear();
+    provider.emitEvent.mockClear();
+
+    await listener(undefined);
+
+    expect(provider.trackFileVisit).toHaveBeenCalledWith('src/app.ts');
+    expect(provider.setFocusedFile).toHaveBeenCalledWith('src/app.ts');
+    expect(provider.emitEvent).toHaveBeenCalledWith('workspace:activeEditorChanged', {
+      filePath: 'src/app.ts',
+    });
+  });
+
   it('normalizes backslashes in paths', async () => {
     const context = makeContext();
     const provider = makeProvider();

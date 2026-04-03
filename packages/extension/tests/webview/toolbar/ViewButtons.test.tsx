@@ -7,36 +7,6 @@ vi.mock('../../../src/webview/vscodeApi', () => ({
   postMessage: vi.fn(),
 }));
 
-const sliderHarness = vi.hoisted(() => ({
-  onValueChange: null as null | ((value: number[]) => void),
-}));
-
-// Mock Slider so we can trigger onValueChange directly
-vi.mock('../../../src/webview/components/ui/controls/slider', () => ({
-  Slider: (props: {
-    value: number[];
-    onValueChange: (value: number[]) => void;
-    min: number;
-    max: number;
-    step: number;
-    className: string;
-    disabled?: boolean;
-  }) => {
-    sliderHarness.onValueChange = props.onValueChange;
-    return (
-      <input
-        data-testid="depth-slider"
-        type="range"
-        min={props.min}
-        max={props.max}
-        value={props.value[0]}
-        disabled={props.disabled}
-        onChange={(e) => props.onValueChange([Number(e.target.value)])}
-      />
-    );
-  },
-}));
-
 import { postMessage } from '../../../src/webview/vscodeApi';
 import { ViewButtons } from '../../../src/webview/components/toolbar/ViewButtons';
 
@@ -61,7 +31,6 @@ function renderWithProviders() {
 describe('ViewButtons', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    sliderHarness.onValueChange = null;
     graphStore.setState({
       availableViews: [],
       activeViewId: 'codegraphy.connections',
@@ -151,7 +120,7 @@ describe('ViewButtons', () => {
     expect(letterSpan.className).toContain('text-xs');
   });
 
-  it('shows depth slider only when depth view is active', () => {
+  it('does not render the depth slider in the view button stack when depth view is active', () => {
     graphStore.setState({
       availableViews: [
         createAvailableView('codegraphy.depth-graph', 'Depth'),
@@ -162,7 +131,7 @@ describe('ViewButtons', () => {
       activeFilePath: 'src/app.ts',
     });
     renderWithProviders();
-    expect(screen.getByText('3')).toBeInTheDocument();
+    expect(screen.queryByTestId('depth-slider')).not.toBeInTheDocument();
   });
 
   it('does not render the depth slider when depth view is not active', () => {
@@ -176,23 +145,6 @@ describe('ViewButtons', () => {
     });
     renderWithProviders();
     expect(screen.queryByTestId('depth-slider')).not.toBeInTheDocument();
-  });
-
-  it('sets opacity to 1 and maxWidth to 8rem when depth view is active', () => {
-    graphStore.setState({
-      availableViews: [
-        createAvailableView('codegraphy.depth-graph', 'Depth'),
-      ],
-      activeViewId: 'codegraphy.depth-graph',
-      depthLimit: 1,
-      maxDepthLimit: 2,
-      activeFilePath: 'src/app.ts',
-    });
-    const { container } = renderWithProviders();
-    const sliderContainer = container.querySelector('[style*="max-width"]') as HTMLElement | null;
-    expect(sliderContainer).not.toBeNull();
-    expect(sliderContainer!.style.opacity).toBe('1');
-    expect(sliderContainer!.style.maxWidth).toBe('8rem');
   });
 
   it('applies default variant to the active view button', () => {
@@ -211,111 +163,6 @@ describe('ViewButtons', () => {
     expect(activeButton.className).not.toBe(inactiveButton.className);
   });
 
-  it('displays the current depth limit as text', () => {
-    graphStore.setState({
-      availableViews: [
-        createAvailableView('codegraphy.depth-graph', 'Depth'),
-      ],
-      activeViewId: 'codegraphy.depth-graph',
-      depthLimit: 4,
-      maxDepthLimit: 4,
-      activeFilePath: 'src/app.ts',
-    });
-    renderWithProviders();
-    expect(screen.getByText('4')).toBeInTheDocument();
-  });
-
-  it('uses the focused file max depth as the slider maximum', () => {
-    graphStore.setState({
-      availableViews: [
-        createAvailableView('codegraphy.depth-graph', 'Depth'),
-      ],
-      activeViewId: 'codegraphy.depth-graph',
-      depthLimit: 2,
-      maxDepthLimit: 5,
-      activeFilePath: 'src/app.ts',
-    });
-    renderWithProviders();
-    expect(screen.getByTestId('depth-slider')).toHaveAttribute('max', '5');
-  });
-
-  it('keeps the depth slider visible when no file is focused in depth view', () => {
-    graphStore.setState({
-      availableViews: [
-        createAvailableView('codegraphy.depth-graph', 'Depth'),
-      ],
-      activeViewId: 'codegraphy.depth-graph',
-      depthLimit: 3,
-      maxDepthLimit: null,
-      activeFilePath: null,
-    });
-    renderWithProviders();
-    expect(screen.getByTestId('depth-slider')).toBeInTheDocument();
-  });
-
-  it('disables the depth slider when no file is focused', () => {
-    graphStore.setState({
-      availableViews: [
-        createAvailableView('codegraphy.depth-graph', 'Depth'),
-      ],
-      activeViewId: 'codegraphy.depth-graph',
-      depthLimit: 3,
-      maxDepthLimit: null,
-      activeFilePath: null,
-    });
-    renderWithProviders();
-    expect(screen.getByTestId('depth-slider')).toBeDisabled();
-  });
-});
-
-describe('ViewButtons depth slider interaction', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    sliderHarness.onValueChange = null;
-    graphStore.setState({
-      availableViews: [
-        createAvailableView('codegraphy.depth-graph', 'Depth'),
-      ],
-      activeViewId: 'codegraphy.depth-graph',
-      depthLimit: 2,
-      maxDepthLimit: 5,
-      activeFilePath: 'src/app.ts',
-    });
-  });
-
-  it('sends CHANGE_DEPTH_LIMIT when the depth slider value changes', () => {
-    renderWithProviders();
-    expect(sliderHarness.onValueChange).not.toBeNull();
-    sliderHarness.onValueChange!([4]);
-    expect(postMessage).toHaveBeenCalledWith({
-      type: 'CHANGE_DEPTH_LIMIT',
-      payload: { depthLimit: 4 },
-    });
-  });
-
-  it('passes the first element of the value array as depthLimit', () => {
-    renderWithProviders();
-    sliderHarness.onValueChange!([3]);
-    expect(postMessage).toHaveBeenCalledWith({
-      type: 'CHANGE_DEPTH_LIMIT',
-      payload: { depthLimit: 3 },
-    });
-  });
-
-  it('sends the correct depth limit for boundary values', () => {
-    renderWithProviders();
-    sliderHarness.onValueChange!([1]);
-    expect(postMessage).toHaveBeenCalledWith({
-      type: 'CHANGE_DEPTH_LIMIT',
-      payload: { depthLimit: 1 },
-    });
-    vi.clearAllMocks();
-    sliderHarness.onValueChange!([5]);
-    expect(postMessage).toHaveBeenCalledWith({
-      type: 'CHANGE_DEPTH_LIMIT',
-      payload: { depthLimit: 5 },
-    });
-  });
 });
 
 describe('ViewButtons availableViews guard', () => {

@@ -27,6 +27,7 @@ export interface GraphViewProviderViewSelectionMethodsSource {
   _viewContext: IViewContext;
   _activeViewId: string;
   _graphData: IGraphData;
+  _updateViewContext?(this: void): void;
   _applyViewTransform?(this: void): void;
   _sendAvailableViews?(this: void): void;
   _sendMessage(message: ExtensionToWebviewMessage): void;
@@ -74,11 +75,17 @@ export function createGraphViewProviderViewSelectionMethods(
     source._applyViewTransform?.();
   };
 
+  const callUpdateViewContext = (): void => {
+    source._updateViewContext?.();
+  };
+
   const callSendAvailableViews = (): void => {
     source._sendAvailableViews?.();
   };
 
   const changeView = async (viewId: string): Promise<void> => {
+    callUpdateViewContext();
+
     await dependencies.changeView(source, viewId, {
       isViewAvailable: (nextViewId, viewContext) =>
         source._viewRegistry.isViewAvailable(nextViewId, viewContext),
@@ -89,6 +96,11 @@ export function createGraphViewProviderViewSelectionMethods(
       sendAvailableViews: () => callSendAvailableViews(),
       sendMessage: message => source._sendMessage(message as ExtensionToWebviewMessage),
       logUnavailableView: nextViewId => dependencies.logUnavailableView(nextViewId),
+    });
+
+    source._sendMessage({
+      type: 'ACTIVE_FILE_UPDATED',
+      payload: { filePath: source._viewContext.focusedFile },
     });
   };
 

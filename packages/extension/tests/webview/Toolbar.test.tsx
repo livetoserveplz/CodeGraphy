@@ -26,7 +26,7 @@ function setDefaultState(overrides: Record<string, unknown> = {}) {
 
 /**
  * Helper to get button groups from the toolbar DOM using data-testid attributes.
- * Layout: [depth-slider] [view-buttons] [dag-buttons] [2d/3d] [node-size-buttons] | [refresh] [export] [plugins] [settings]
+ * Layout: top controls [view-buttons] [dag-buttons] [2d/3d] [node-size-buttons] | bottom controls [depth] [refresh] [export] [plugins] [settings]
  */
 function getButtonGroups(container: HTMLElement) {
   const viewGroup = container.querySelector('[data-testid="view-buttons"]');
@@ -70,10 +70,13 @@ describe('Toolbar', () => {
       expect(topGroup).toBeTruthy();
       expect(bottomGroup).toBeTruthy();
       expect(topGroup?.className).toContain('flex-col');
+      expect(bottomGroup?.className).toContain('flex');
       expect(bottomGroup?.className).toContain('flex-col');
+      expect(bottomGroup?.className).toContain('items-center');
       expect(topGroup?.querySelector('[data-testid="view-buttons"]')).toBeTruthy();
       expect(topGroup?.querySelector('[data-testid="dag-buttons"]')).toBeTruthy();
       expect(topGroup?.querySelector('[data-testid="node-size-buttons"]')).toBeTruthy();
+      expect(bottomGroup?.querySelector('[data-testid="toolbar-actions"]')).toBeTruthy();
       expect(viewButtons?.className).toContain('flex-col');
       expect(viewButtons?.className).not.toContain('bg-popover/80');
       expect(viewButtons?.className).not.toContain('border');
@@ -85,6 +88,19 @@ describe('Toolbar', () => {
       expect(nodeSizeButtons?.className).not.toContain('border');
       expect(screen.getByTitle('Refresh Graph').closest('[data-testid="toolbar-bottom-group"]')).toBe(bottomGroup);
       expect(screen.getByTitle('Settings').closest('[data-testid="toolbar-bottom-group"]')).toBe(bottomGroup);
+    });
+
+    it('keeps the action buttons stacked inside the bottom group', () => {
+      const { container } = render(<Toolbar />);
+      const bottomGroup = container.querySelector('[data-testid="toolbar-bottom-group"]') as HTMLElement | null;
+      const actionsGroup = container.querySelector('[data-testid="toolbar-actions"]') as HTMLElement | null;
+      const refreshButton = screen.getByTitle('Refresh Graph');
+      const actionsColumn = refreshButton.closest('div.flex-col.items-center.gap-1\\.5') as HTMLElement | null;
+
+      expect(bottomGroup?.className).toContain('items-center');
+      expect(actionsGroup).toBe(actionsColumn);
+      expect(actionsColumn).toBeTruthy();
+      expect(actionsColumn?.className).toContain('flex-col');
     });
 
     it('renders a collapse toggle at the bottom of the top toolbar group', () => {
@@ -208,27 +224,30 @@ describe('Toolbar', () => {
   });
 
   describe('depth slider', () => {
-    it('does not render a depth-slider placeholder when depth view is not active', () => {
+    it('does not render a depth control when depth view is not active', () => {
       const { container } = render(<Toolbar />);
       const topGroup = container.querySelector('[data-testid="toolbar-top-group"]') as HTMLElement | null;
       const controls = container.querySelector('[data-testid="toolbar-primary-controls"]') as HTMLElement | null;
-      expect(screen.queryByTestId('depth-slider')).toBeNull();
+      expect(screen.queryByTestId('depth-control')).toBeNull();
       expect(topGroup?.querySelector('[data-testid="view-buttons"]')).toBeTruthy();
       expect(controls?.className).not.toContain('max-h-0');
     });
 
-    it('is visible when depth view is active', () => {
+    it('renders the depth control in the bottom toolbar group when depth view is active', () => {
       setDefaultState({ activeViewId: 'codegraphy.depth-graph', activeFilePath: 'src/app.ts' });
       const { container } = render(<Toolbar />);
-      const sliderContainer = container.querySelector('[style*="max-width"]');
-      expect(sliderContainer?.getAttribute('style')).toContain('max-width: 8rem');
-      expect(sliderContainer?.getAttribute('style')).toContain('opacity: 1');
+      const topGroup = container.querySelector('[data-testid="toolbar-top-group"]') as HTMLElement | null;
+      const bottomGroup = container.querySelector('[data-testid="toolbar-bottom-group"]') as HTMLElement | null;
+      const settingsRow = container.querySelector('[data-testid="toolbar-settings-row"]') as HTMLElement | null;
+      expect(bottomGroup?.querySelector('[data-testid="depth-control"]')).toBeTruthy();
+      expect(settingsRow?.querySelector('[data-testid="depth-control"]')).toBeTruthy();
+      expect(topGroup?.querySelector('[data-testid="depth-control"]')).toBeFalsy();
     });
 
     it('displays current depth limit value', () => {
       setDefaultState({ activeViewId: 'codegraphy.depth-graph', depthLimit: 3, activeFilePath: 'src/app.ts' });
       render(<Toolbar />);
-      expect(screen.getByText('3')).toBeTruthy();
+      expect(screen.getByTestId('depth-value')).toHaveTextContent('3');
     });
   });
 

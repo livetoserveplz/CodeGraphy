@@ -19,12 +19,13 @@ import {
 } from '../ui/menus/dropdown-menu';
 import { useGraphStore } from '../../store/state';
 import { postMessage } from '../../vscodeApi';
+import { DepthControl } from './DepthControl';
 
 export function ToolbarActions(): React.ReactElement {
   const setActivePanel = useGraphStore(s => s.setActivePanel);
 
   return (
-    <div className="flex flex-col items-center gap-1.5">
+    <div data-testid="toolbar-actions" className="flex flex-col items-center gap-1.5">
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
@@ -93,20 +94,23 @@ export function ToolbarActions(): React.ReactElement {
         <TooltipContent side="right">Plugins</TooltipContent>
       </Tooltip>
 
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-7 w-7 bg-transparent"
-            onClick={() => setActivePanel('settings')}
-            title="Settings"
-          >
-            <MdiIcon path={mdiCogOutline} size={16} />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent side="right">Settings</TooltipContent>
-      </Tooltip>
+      <div data-testid="toolbar-settings-row" className="flex items-center gap-1.5">
+        <DepthControl />
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-7 w-7 bg-transparent"
+              onClick={() => setActivePanel('settings')}
+              title="Settings"
+            >
+              <MdiIcon path={mdiCogOutline} size={16} />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="right">Settings</TooltipContent>
+        </Tooltip>
+      </div>
     </div>
   );
 }

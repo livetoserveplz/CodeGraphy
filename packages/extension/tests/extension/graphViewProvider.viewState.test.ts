@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as vscode from 'vscode';
 import type { IGraphData } from '../../src/shared/graph/types';
+import type { IViewContext } from '../../src/core/views/contracts';
 import { GraphViewProvider } from '../../src/extension/graphViewProvider';
 import { getGraphViewProviderInternals } from './graphViewProvider/internals';
 
@@ -123,6 +124,52 @@ describe('GraphViewProvider view state and internal helpers', () => {
     expect(sendMessageSpy).toHaveBeenCalledWith({
       type: 'GRAPH_DATA_UPDATED',
       payload: { nodes: [], edges: [] },
+    });
+  });
+
+  it('refreshes the focused file from the active editor when switching into depth view', async () => {
+    const activeEditor = {
+      document: { uri: vscode.Uri.file('/test/workspace/src/app.ts') },
+    } as unknown as vscode.TextEditor;
+    Object.defineProperty(vscode.window, 'activeTextEditor', {
+      configurable: true,
+      value: activeEditor,
+    });
+
+    const context = createContext();
+    const provider = new GraphViewProvider(
+      vscode.Uri.file('/test/extension'),
+      context as unknown as vscode.ExtensionContext
+    );
+    const internals = getGraphViewProviderInternals(provider);
+    (provider as unknown as { _rawGraphData: IGraphData })._rawGraphData = {
+      nodes: [
+        { id: 'src/app.ts', label: 'app.ts', color: '#ffffff' },
+        { id: 'src/lib.ts', label: 'lib.ts', color: '#ffffff' },
+        { id: 'src/deep.ts', label: 'deep.ts', color: '#ffffff' },
+      ],
+      edges: [
+        { id: 'src/app.ts->src/lib.ts', from: 'src/app.ts', to: 'src/lib.ts' },
+        { id: 'src/lib.ts->src/deep.ts', from: 'src/lib.ts', to: 'src/deep.ts' },
+      ],
+    };
+    const sendMessageSpy = vi.spyOn(
+      internals._webviewMethods,
+      '_sendMessage'
+    ).mockImplementation(() => {});
+
+    await provider.changeView('codegraphy.depth-graph');
+
+    expect((provider as unknown as { _viewContext: IViewContext })._viewContext.focusedFile).toBe(
+      'src/app.ts'
+    );
+    expect((provider as unknown as { _graphData: IGraphData })._graphData.nodes.map(node => node.id)).toEqual([
+      'src/app.ts',
+      'src/lib.ts',
+    ]);
+    expect(sendMessageSpy).toHaveBeenCalledWith({
+      type: 'ACTIVE_FILE_UPDATED',
+      payload: { filePath: 'src/app.ts' },
     });
   });
 

@@ -13,6 +13,30 @@ interface PendingWorkspaceRefresh {
 
 const pendingWorkspaceRefreshes = new WeakMap<GraphViewProvider, PendingWorkspaceRefresh>();
 
+function getWorkspaceRelativeFilePath(
+  editor: vscode.TextEditor | undefined,
+  workspaceFolders: readonly vscode.WorkspaceFolder[] | undefined,
+): string | undefined {
+  if (!editor || editor.document.uri.scheme !== 'file') {
+    return undefined;
+  }
+
+  const workspaceFolder = workspaceFolders?.[0];
+  if (!workspaceFolder) {
+    return undefined;
+  }
+
+  const relativePath = path.relative(
+    workspaceFolder.uri.fsPath,
+    editor.document.uri.fsPath
+  );
+  if (relativePath.startsWith('..')) {
+    return undefined;
+  }
+
+  return relativePath.replace(/\\/g, '/');
+}
+
 function scheduleWorkspaceRefresh(
   provider: GraphViewProvider,
   logMessage: string,
@@ -39,20 +63,30 @@ async function syncActiveEditor(
   provider: GraphViewProvider,
   editor: vscode.TextEditor | undefined,
 ): Promise<void> {
-  if (editor && editor.document.uri.scheme === 'file') {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-    if (workspaceFolder) {
-      const relativePath = path.relative(
-        workspaceFolder.uri.fsPath,
-        editor.document.uri.fsPath
-      );
-      if (!relativePath.startsWith('..')) {
-        const normalizedPath = relativePath.replace(/\\/g, '/');
-        await provider.trackFileVisit(normalizedPath);
-        provider.setFocusedFile(normalizedPath);
-        provider.emitEvent('workspace:activeEditorChanged', { filePath: normalizedPath });
-        return;
-      }
+  const normalizedPath = getWorkspaceRelativeFilePath(
+    editor,
+    vscode.workspace.workspaceFolders,
+  );
+  if (normalizedPath) {
+    await provider.trackFileVisit(normalizedPath);
+    provider.setFocusedFile(normalizedPath);
+    provider.emitEvent('workspace:activeEditorChanged', { filePath: normalizedPath });
+    return;
+  }
+
+  if (!editor) {
+    const fallbackEditor = (vscode.window.visibleTextEditors ?? []).find(candidate =>
+      getWorkspaceRelativeFilePath(candidate, vscode.workspace.workspaceFolders) !== undefined
+    );
+    const fallbackPath = getWorkspaceRelativeFilePath(
+      fallbackEditor,
+      vscode.workspace.workspaceFolders,
+    );
+    if (fallbackPath) {
+      await provider.trackFileVisit(fallbackPath);
+      provider.setFocusedFile(fallbackPath);
+      provider.emitEvent('workspace:activeEditorChanged', { filePath: fallbackPath });
+      return;
     }
   }
 
