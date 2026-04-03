@@ -121,4 +121,10 @@ describe('GraphStore actions', () => {
 
     expect(store.getState().maxFiles).toBe(1200);
   });
+
+  it('setMaxTimelineCommits updates the timeline commit limit', () => {
+    store.getState().setMaxTimelineCommits(900);
+
+    expect(store.getState().maxTimelineCommits).toBe(900);
+  });
 });

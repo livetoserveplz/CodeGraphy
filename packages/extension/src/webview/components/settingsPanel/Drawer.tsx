@@ -1,6 +1,6 @@
 /**
- * @fileoverview Settings panel with four collapsible accordion sections:
- * Forces, Groups, Filters, and Display.
+ * @fileoverview Settings panel with collapsible accordion sections:
+ * General, Forces, Groups, Filters, and Display.
  * @module webview/components/settingsPanel/Drawer
  */
 
@@ -14,6 +14,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/
 import { DisplaySection } from './display/Section';
 import { FilterSection } from './filters/Section';
 import { ForcesSection } from './forces/Section';
+import { GeneralSection } from './general/Section';
 import { GroupsSection } from './groups/Section';
 import { SectionHeader } from './SectionHeader';
 
@@ -24,6 +25,7 @@ interface SettingsPanelProps {
 
 export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps): React.ReactElement | null {
   const [forcesOpen, setForcesOpen] = useState(false);
+  const [generalOpen, setGeneralOpen] = useState(false);
   const [groupsOpen, setGroupsOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [displayOpen, setDisplayOpen] = useState(false);
@@ -66,6 +68,9 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps): 
 
       <ScrollArea className="flex-1 min-h-0">
         <div className="px-3 pb-3">
+          <SectionHeader title="General" open={generalOpen} onToggle={() => setGeneralOpen((open) => !open)} />
+          {generalOpen && <GeneralSection />}
+
           <SectionHeader title="Forces" open={forcesOpen} onToggle={() => setForcesOpen((open) => !open)} />
           {forcesOpen && <ForcesSection />}
 

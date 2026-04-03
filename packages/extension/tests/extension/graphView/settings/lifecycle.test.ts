@@ -27,7 +27,8 @@ function createSnapshot(
     particleSize: 4,
     showLabels: true,
     nodeSizeMode: 'uniform',
-    maxFiles: 500,
+    maxFiles: 1000,
+    maxTimelineCommits: 500,
     hiddenPluginGroups: ['plugin:codegraphy.python'],
     ...overrides,
   };

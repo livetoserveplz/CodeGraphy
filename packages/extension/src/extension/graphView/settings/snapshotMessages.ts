@@ -28,7 +28,8 @@ export function captureGraphViewSettingsSnapshot(
     particleSpeed: config.get('particleSpeed', 0.005),
     particleSize: config.get('particleSize', 4),
     showLabels: config.get('showLabels', true),
-    maxFiles: config.get('maxFiles', 500),
+    maxFiles: config.get('maxFiles', 1000),
+    maxTimelineCommits: config.get('timeline.maxCommits', 500),
     hiddenPluginGroups: config.get('hiddenPluginGroups', []),
     nodeSizeMode,
   };
@@ -102,6 +103,10 @@ export function buildGraphViewAllSettingsMessages(
       {
         type: 'MAX_FILES_UPDATED',
         payload: { maxFiles: snapshot.maxFiles },
+      },
+      {
+        type: 'MAX_TIMELINE_COMMITS_UPDATED',
+        payload: { maxTimelineCommits: snapshot.maxTimelineCommits },
       },
       {
         type: 'NODE_SIZE_MODE_UPDATED',

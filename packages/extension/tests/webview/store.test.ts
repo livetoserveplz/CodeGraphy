@@ -146,6 +146,14 @@ describe('GraphStore', () => {
     expect(store.getState().maxFiles).toBe(1000);
   });
 
+  it('handles MAX_TIMELINE_COMMITS_UPDATED message', () => {
+    store.getState().handleExtensionMessage({
+      type: 'MAX_TIMELINE_COMMITS_UPDATED',
+      payload: { maxTimelineCommits: 750 },
+    });
+    expect(store.getState().maxTimelineCommits).toBe(750);
+  });
+
   it('handles ACTIVE_FILE_UPDATED message', () => {
     store.getState().handleExtensionMessage({
       type: 'ACTIVE_FILE_UPDATED',

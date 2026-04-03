@@ -109,6 +109,12 @@ export function handleMaxFilesUpdated(
   return { maxFiles: message.payload.maxFiles };
 }
 
+export function handleMaxTimelineCommitsUpdated(
+  message: Extract<ExtensionToWebviewMessage, { type: 'MAX_TIMELINE_COMMITS_UPDATED' }>,
+): PartialState {
+  return { maxTimelineCommits: message.payload.maxTimelineCommits };
+}
+
 export function handleActiveFileUpdated(
   message: Extract<ExtensionToWebviewMessage, { type: 'ACTIVE_FILE_UPDATED' }>,
 ): PartialState {

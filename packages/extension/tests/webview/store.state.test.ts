@@ -34,7 +34,8 @@ describe('GraphStore initial state', () => {
     expect(state.activeViewId).toBe('codegraphy.connections');
     expect(state.depthLimit).toBe(1);
     expect(state.dagMode).toBeNull();
-    expect(state.maxFiles).toBe(500);
+    expect(state.maxFiles).toBe(1000);
+    expect(state.maxTimelineCommits).toBe(500);
   });
 
   it('starts with empty plugin decoration and context menu state', () => {

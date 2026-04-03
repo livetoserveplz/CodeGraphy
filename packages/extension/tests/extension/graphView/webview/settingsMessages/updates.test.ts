@@ -125,6 +125,24 @@ describe('graph view settings update message', () => {
     expect(handlers.updateConfig).toHaveBeenCalledWith('maxFiles', 250);
   });
 
+  it('persists update-max-timeline-commits through config updates', async () => {
+    const state = createState();
+    const handlers = createHandlers();
+
+    await expect(
+      applySettingsUpdateMessage(
+        {
+          type: 'UPDATE_MAX_TIMELINE_COMMITS',
+          payload: { maxTimelineCommits: 750 },
+        },
+        state,
+        handlers,
+      ),
+    ).resolves.toBe(true);
+
+    expect(handlers.updateConfig).toHaveBeenCalledWith('timeline.maxCommits', 750);
+  });
+
   it('updates label visibility and publishes it immediately', async () => {
     const state = createState();
     const handlers = createHandlers();

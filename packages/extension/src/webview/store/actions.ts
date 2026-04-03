@@ -38,6 +38,7 @@ export function createActions(set: SetState, get: GetState) {
     setDagMode: (mode: GraphState['dagMode']) => set({ dagMode: mode }),
     setFolderNodeColor: (color: string) => set({ folderNodeColor: color }),
     setMaxFiles: (max: number) => set({ maxFiles: max }),
+    setMaxTimelineCommits: (max: number) => set({ maxTimelineCommits: max }),
     setPlaybackSpeed: (speed: number) => set({ playbackSpeed: speed }),
     setIsPlaying: (playing: boolean) => set({ isPlaying: playing }),
     setOptimisticGroupUpdate: (groupId: string, updates: Partial<GraphState['groups'][number]>) =>

@@ -50,6 +50,10 @@ export async function applySettingsUpdateMessage(
       await handlers.updateConfig('maxFiles', message.payload.maxFiles);
       return true;
 
+    case 'UPDATE_MAX_TIMELINE_COMMITS':
+      await handlers.updateConfig('timeline.maxCommits', message.payload.maxTimelineCommits);
+      return true;
+
     default:
       return false;
   }

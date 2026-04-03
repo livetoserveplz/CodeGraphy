@@ -27,7 +27,8 @@ function createSnapshot(
     particleSize: 4,
     showLabels: true,
     nodeSizeMode: 'uniform',
-    maxFiles: 500,
+    maxFiles: 1000,
+    maxTimelineCommits: 500,
     hiddenPluginGroups: ['plugin:codegraphy.python'],
     ...overrides,
   };
@@ -113,9 +114,10 @@ describe('graphView/settings/sync', () => {
       },
     });
 
-    expect(order.slice(-3)).toEqual([
+    expect(order.slice(-4)).toEqual([
       'FILTER_PATTERNS_UPDATED',
       'MAX_FILES_UPDATED',
+      'MAX_TIMELINE_COMMITS_UPDATED',
       'NODE_SIZE_MODE_UPDATED',
     ]);
   });

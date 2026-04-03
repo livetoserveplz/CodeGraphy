@@ -239,7 +239,7 @@
 			"properties": {
 				"codegraphy.maxFiles": {
 					"type": "number",
-					"default": 500,
+					"default": 1000,
 					"description": "Maximum number of files to analyze. Shows a warning if exceeded."
 				},
 				"codegraphy.include": {

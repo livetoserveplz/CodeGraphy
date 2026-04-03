@@ -74,6 +74,7 @@ describe('ResetSettingsAction', () => {
     particleSize: 8,
     showLabels: false,
     maxFiles: 1000,
+    maxTimelineCommits: 500,
     hiddenPluginGroups: ['group-1', 'group-2'],
     nodeSizeMode: 'file-size',
   };
@@ -115,6 +116,7 @@ describe('ResetSettingsAction', () => {
       particleSize: 8,
       showLabels: false,
       maxFiles: 1000,
+      'timeline.maxCommits': 500,
       hiddenPluginGroups: ['group-1', 'group-2'],
     };
 
@@ -179,6 +181,7 @@ describe('ResetSettingsAction', () => {
     expect(codegraphyStore['showOrphans']).toBe(false);
     expect(codegraphyStore['directionMode']).toBe('particles');
     expect(codegraphyStore['maxFiles']).toBe(1000);
+    expect(codegraphyStore['timeline.maxCommits']).toBe(500);
     expect(codegraphyStore['hiddenPluginGroups']).toEqual(['group-1', 'group-2']);
     // bidirectionalEdges config key maps to bidirectionalMode snapshot field
     expect(codegraphyStore['bidirectionalEdges']).toBe('combined');

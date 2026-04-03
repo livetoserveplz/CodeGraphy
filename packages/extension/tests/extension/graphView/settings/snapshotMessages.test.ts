@@ -46,7 +46,8 @@ describe('graphView/settings/snapshotMessages', () => {
       particleSpeed: 0.005,
       particleSize: 4,
       showLabels: true,
-      maxFiles: 500,
+      maxFiles: 1000,
+      maxTimelineCommits: 500,
       hiddenPluginGroups: [],
       nodeSizeMode: 'uniform',
     });
@@ -66,6 +67,7 @@ describe('graphView/settings/snapshotMessages', () => {
         particleSize: 6,
         showLabels: false,
         maxFiles: 250,
+        'timeline.maxCommits': 750,
         hiddenPluginGroups: ['plugin:codegraphy.typescript'],
       }),
       {
@@ -97,6 +99,7 @@ describe('graphView/settings/snapshotMessages', () => {
       particleSize: 6,
       showLabels: false,
       maxFiles: 250,
+      maxTimelineCommits: 750,
       hiddenPluginGroups: ['plugin:codegraphy.typescript'],
       nodeSizeMode: 'access-count',
     });
@@ -161,6 +164,7 @@ describe('graphView/settings/snapshotMessages', () => {
           particleSize: 6,
           showLabels: false,
           maxFiles: 250,
+          maxTimelineCommits: 750,
           hiddenPluginGroups: [],
           nodeSizeMode: 'access-count',
         },
@@ -208,6 +212,10 @@ describe('graphView/settings/snapshotMessages', () => {
         {
           type: 'MAX_FILES_UPDATED',
           payload: { maxFiles: 250 },
+        },
+        {
+          type: 'MAX_TIMELINE_COMMITS_UPDATED',
+          payload: { maxTimelineCommits: 750 },
         },
         {
           type: 'NODE_SIZE_MODE_UPDATED',

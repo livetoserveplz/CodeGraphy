@@ -47,6 +47,7 @@ export interface IStoreFields {
   pluginContextMenuItems: IPluginContextMenuItem[];
   activePanel: 'none' | 'settings' | 'plugins';
   maxFiles: number;
+  maxTimelineCommits: number;
   activeFilePath: string | null;
   timelineActive: boolean;
   timelineCommits: ICommitInfo[];

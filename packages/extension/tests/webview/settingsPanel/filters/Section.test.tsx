@@ -14,7 +14,6 @@ function setStoreState(overrides: Record<string, unknown> = {}) {
     filterPatterns: [],
     pluginFilterPatterns: [],
     showOrphans: true,
-    maxFiles: 500,
     ...overrides,
   });
 }
@@ -125,80 +124,9 @@ describe('FilterSection', () => {
     });
   });
 
-  it('decreases max files and clamps at one', () => {
-    renderSection({ maxFiles: 50 });
+  it('does not render the max-files control', () => {
+    renderSection();
 
-    fireEvent.click(screen.getByTitle('Decrease by 100'));
-
-    expect(graphStore.getState().maxFiles).toBe(1);
-    expect(sentMessages).toContainEqual({
-      type: 'UPDATE_MAX_FILES',
-      payload: { maxFiles: 1 },
-    });
-  });
-
-  it('disables the decrease button at the minimum max-file value', () => {
-    renderSection({ maxFiles: 1 });
-
-    expect(screen.getByTitle('Decrease by 100')).toBeDisabled();
-  });
-
-  it('increases max files by one hundred', () => {
-    renderSection({ maxFiles: 500 });
-
-    fireEvent.click(screen.getByTitle('Increase by 100'));
-
-    expect(graphStore.getState().maxFiles).toBe(600);
-    expect(sentMessages).toContainEqual({
-      type: 'UPDATE_MAX_FILES',
-      payload: { maxFiles: 600 },
-    });
-  });
-
-  it('commits max files on blur', () => {
-    renderSection({ maxFiles: 500 });
-
-    const input = screen.getByDisplayValue('500');
-    fireEvent.change(input, { target: { value: '250' } });
-    fireEvent.blur(input);
-
-    expect(graphStore.getState().maxFiles).toBe(250);
-    expect(sentMessages).toContainEqual({
-      type: 'UPDATE_MAX_FILES',
-      payload: { maxFiles: 250 },
-    });
-  });
-
-  it('ignores non-numeric max-file input changes', () => {
-    renderSection({ maxFiles: 500 });
-
-    const input = screen.getByDisplayValue('500');
-    fireEvent.change(input, { target: { value: 'abc' } });
-
-    expect(graphStore.getState().maxFiles).toBe(500);
-  });
-
-  it('commits max files on enter', () => {
-    renderSection({ maxFiles: 500 });
-
-    const input = screen.getByDisplayValue('500');
-    fireEvent.change(input, { target: { value: '350' } });
-    fireEvent.keyDown(input, { key: 'Enter' });
-
-    expect(graphStore.getState().maxFiles).toBe(350);
-    expect(sentMessages).toContainEqual({
-      type: 'UPDATE_MAX_FILES',
-      payload: { maxFiles: 350 },
-    });
-  });
-
-  it('does not commit max files for non-enter key presses', () => {
-    renderSection({ maxFiles: 500 });
-
-    const input = screen.getByDisplayValue('500');
-    fireEvent.change(input, { target: { value: '350' } });
-    fireEvent.keyDown(input, { key: 'Escape' });
-
-    expect(sentMessages).toEqual([]);
+    expect(screen.queryByText('Max Files')).not.toBeInTheDocument();
   });
 });

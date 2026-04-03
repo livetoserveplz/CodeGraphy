@@ -50,6 +50,7 @@ export interface GraphState {
   pluginContextMenuItems: IPluginContextMenuItem[];
   activePanel: 'none' | 'settings' | 'plugins';
   maxFiles: number;
+  maxTimelineCommits: number;
   activeFilePath: string | null;
   timelineActive: boolean;
   timelineCommits: ICommitInfo[];
@@ -82,6 +83,7 @@ export interface GraphState {
   setDagMode: (mode: DagMode) => void;
   setFolderNodeColor: (color: string) => void;
   setMaxFiles: (max: number) => void;
+  setMaxTimelineCommits: (max: number) => void;
   setPlaybackSpeed: (speed: number) => void;
   setIsPlaying: (playing: boolean) => void;
   handleExtensionMessage: (message: ExtensionToWebviewMessage) => void;

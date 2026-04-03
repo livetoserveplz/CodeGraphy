@@ -23,8 +23,8 @@ describe('Configuration (configReaders)', () => {
       expect(new Configuration().maxFiles).toBe(1000);
     });
 
-    it('returns the default 500 when not configured', () => {
-      expect(new Configuration().maxFiles).toBe(500);
+    it('returns the default 1000 when not configured', () => {
+      expect(new Configuration().maxFiles).toBe(1000);
     });
 
     it('reads from the codegraphy section', () => {
@@ -180,7 +180,7 @@ describe('Configuration (configReaders)', () => {
 
     it('uses defaults for unconfigured values', () => {
       const all = new Configuration().getAll();
-      expect(all.maxFiles).toBe(500);
+      expect(all.maxFiles).toBe(1000);
       expect(all.showOrphans).toBe(true);
       expect(all.plugins).toEqual([]);
     });

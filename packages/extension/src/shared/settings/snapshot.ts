@@ -16,5 +16,6 @@ export interface ISettingsSnapshot {
   showLabels: boolean;
   nodeSizeMode: NodeSizeMode;
   maxFiles: number;
+  maxTimelineCommits: number;
   hiddenPluginGroups: string[];
 }

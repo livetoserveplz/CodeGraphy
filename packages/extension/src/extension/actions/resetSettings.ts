@@ -31,6 +31,7 @@ const CONFIG_TO_SNAPSHOT: Record<string, keyof ISettingsSnapshot> = {
   particleSize: 'particleSize',
   showLabels: 'showLabels',
   maxFiles: 'maxFiles',
+  'timeline.maxCommits': 'maxTimelineCommits',
   hiddenPluginGroups: 'hiddenPluginGroups',
 };
 

@@ -37,7 +37,8 @@ function createSettingsSnapshot(): ISettingsSnapshot {
     particleSpeed: 0.005,
     particleSize: 4,
     showLabels: true,
-    maxFiles: 500,
+    maxFiles: 1000,
+    maxTimelineCommits: 500,
     nodeSizeMode: 'connections',
     physics: {
       repelForce: 1,

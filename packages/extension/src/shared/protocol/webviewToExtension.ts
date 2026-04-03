@@ -49,6 +49,7 @@ export type WebviewToExtensionMessage =
   | { type: 'TOGGLE_RULE'; payload: { qualifiedId: string; enabled: boolean } }
   | { type: 'TOGGLE_PLUGIN'; payload: { pluginId: string; enabled: boolean } }
   | { type: 'UPDATE_MAX_FILES'; payload: { maxFiles: number } }
+  | { type: 'UPDATE_MAX_TIMELINE_COMMITS'; payload: { maxTimelineCommits: number } }
   | { type: 'INDEX_REPO' }
   | { type: 'JUMP_TO_COMMIT'; payload: { sha: string } }
   | { type: 'RESET_TIMELINE' }

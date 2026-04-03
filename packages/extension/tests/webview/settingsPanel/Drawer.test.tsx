@@ -37,6 +37,7 @@ function setStoreState(overrides: Record<string, unknown> = {}) {
     showLabels: true,
     graphMode: '2d',
     maxFiles: 500,
+    maxTimelineCommits: 500,
     ...overrides,
   });
 }
@@ -80,6 +81,16 @@ describe('SettingsPanel', () => {
     fireEvent.click(screen.getByText('Filters'));
 
     expect(screen.getByText('Show Orphans')).toBeInTheDocument();
+    expect(screen.queryByText('Max Files')).not.toBeInTheDocument();
+  });
+
+  it('renders general content when the general section is opened', () => {
+    renderPanel();
+
+    fireEvent.click(screen.getByText('General'));
+
+    expect(screen.getByText('Max Files')).toBeInTheDocument();
+    expect(screen.getByText('Max Timeline Commits')).toBeInTheDocument();
   });
 
   it('renders display content when the display section is opened', () => {

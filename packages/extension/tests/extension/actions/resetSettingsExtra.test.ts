@@ -65,6 +65,7 @@ describe('ResetSettingsAction (extra mutant coverage)', () => {
     particleSize: 4,
     showLabels: true,
     maxFiles: 500,
+    maxTimelineCommits: 500,
     hiddenPluginGroups: [],
     nodeSizeMode: 'connections',
   };
@@ -84,6 +85,7 @@ describe('ResetSettingsAction (extra mutant coverage)', () => {
       particleSize: 4,
       showLabels: true,
       maxFiles: 500,
+      'timeline.maxCommits': 500,
       hiddenPluginGroups: [],
     };
   });
@@ -155,6 +157,7 @@ describe('ResetSettingsAction (extra mutant coverage)', () => {
     expect(updatedKeys).toContain('particleSize');
     expect(updatedKeys).toContain('showLabels');
     expect(updatedKeys).toContain('maxFiles');
+    expect(updatedKeys).toContain('timeline.maxCommits');
     expect(updatedKeys).toContain('hiddenPluginGroups');
   });
 
