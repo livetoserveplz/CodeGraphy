@@ -150,6 +150,27 @@ describe('App', () => {
     });
     expect(screen.getByTitle('Export')).toBeInTheDocument();
   });
+
+  it('renders the depth control as a bottom-right overlay outside the left toolbar', async () => {
+    graphStore.setState({
+      isLoading: false,
+      graphData: {
+        nodes: [{ id: 'test.ts', label: 'test.ts', color: '#3B82F6' }],
+        edges: [],
+      },
+      activeViewId: 'codegraphy.depth-graph',
+      depthLimit: 1,
+      maxDepthLimit: 3,
+      activeFilePath: 'src/test.ts',
+    });
+
+    const { container } = render(<App />);
+    const overlay = screen.getByTestId('depth-control-overlay');
+    const toolbar = container.querySelector('[data-testid="toolbar"]');
+
+    expect(overlay.querySelector('[data-testid="depth-control"]')).toBeTruthy();
+    expect(toolbar?.querySelector('[data-testid="depth-control"]')).toBeFalsy();
+  });
 });
 
 // ── Message Handler Coverage ────────────────────────────────────────────────
@@ -247,5 +268,13 @@ describe('App: message handlers', () => {
     });
     expect(graphStore.getState().depthLimit).toBe(3);
     expect(graphStore.getState().maxDepthLimit).toBe(4);
+  });
+
+  it('ACTIVE_FILE_UPDATED message is handled', async () => {
+    render(<App />);
+    await act(async () => {
+      sendMessage({ type: 'ACTIVE_FILE_UPDATED', payload: { filePath: 'src/app.ts' } });
+    });
+    expect(graphStore.getState().activeFilePath).toBe('src/app.ts');
   });
 });

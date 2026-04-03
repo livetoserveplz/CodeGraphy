@@ -203,6 +203,42 @@ describe('graphView/provider/view/context', () => {
     getConfiguration.mockRestore();
   });
 
+  it('falls back to a visible file editor when there is no active text editor', () => {
+    const source = createSource();
+    const visibleEditor = {
+      document: {
+        uri: {
+          scheme: 'file',
+          fsPath: '/workspace/src/app.ts',
+        },
+      },
+    } as unknown as vscode.TextEditor;
+    const buildViewContext = vi.fn(
+      () =>
+        ({
+          activePlugins: new Set<string>(['plugin.test']),
+          depthLimit: 2,
+          focusedFile: 'src/app.ts',
+          folderNodeColor: '#654321',
+        }) satisfies IViewContext,
+    );
+    const methods = createGraphViewProviderViewContextMethods(
+      source as never,
+      createDependencies({
+        buildViewContext,
+        getActiveTextEditor: vi.fn(() => undefined),
+        getVisibleTextEditors: vi.fn(() => [visibleEditor]),
+      }),
+    );
+
+    methods._updateViewContext();
+
+    const firstCall = buildViewContext.mock.calls.at(0);
+    const options = firstCall?.at(0) as Parameters<typeof buildGraphViewContext>[0] | undefined;
+    expect(options?.activeEditor).toBe(visibleEditor);
+    expect(source._viewContext.focusedFile).toBe('src/app.ts');
+  });
+
   it('sends available views through the provider message bridge', () => {
     const source = createSource({
       _activeViewId: 'codegraphy.depth-graph',
@@ -432,6 +468,7 @@ function createDependencies(
     getConfiguration,
     getWorkspaceFolders: vi.fn(() => []),
     getActiveTextEditor: vi.fn(() => undefined),
+    getVisibleTextEditors: vi.fn(() => []),
     asRelativePath: vi.fn((uri: { fsPath?: string }) => uri.fsPath ?? ''),
     buildViewContext,
     applyViewTransform,

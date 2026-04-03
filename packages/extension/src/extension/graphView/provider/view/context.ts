@@ -47,6 +47,7 @@ export interface GraphViewProviderViewContextMethodDependencies {
   getConfiguration(section: string): GraphViewProviderConfigLike;
   getWorkspaceFolders(): readonly vscode.WorkspaceFolder[] | undefined;
   getActiveTextEditor(): vscode.TextEditor | undefined;
+  getVisibleTextEditors(): readonly vscode.TextEditor[];
   asRelativePath(uri: vscode.Uri): string;
   buildViewContext: typeof buildGraphViewContext;
   applyViewTransform: typeof applyGraphViewTransform;
@@ -62,6 +63,7 @@ function createDefaultDependencies(): GraphViewProviderViewContextMethodDependen
     getConfiguration: section => vscode.workspace.getConfiguration(section),
     getWorkspaceFolders: () => vscode.workspace.workspaceFolders,
     getActiveTextEditor: () => vscode.window.activeTextEditor,
+    getVisibleTextEditors: () => vscode.window.visibleTextEditors,
     asRelativePath: uri => vscode.workspace.asRelativePath(uri),
     buildViewContext: buildGraphViewContext,
     applyViewTransform: applyGraphViewTransform,
@@ -79,10 +81,15 @@ export function createGraphViewProviderViewContextMethods(
 ): GraphViewProviderViewContextMethods {
   const _updateViewContext = (): void => {
     const config = dependencies.getConfiguration('codegraphy');
-    source._viewContext = dependencies.buildViewContext({
+    const activeEditor =
+      dependencies.getActiveTextEditor() ??
+      (dependencies.getVisibleTextEditors() ?? []).find(
+        editor => editor.document.uri.scheme === 'file',
+      );
+    const nextViewContext = dependencies.buildViewContext({
       analyzer: source._analyzer,
       workspaceFolders: dependencies.getWorkspaceFolders(),
-      activeEditor: dependencies.getActiveTextEditor(),
+      activeEditor,
       readSavedDepthLimit: () => source._context.workspaceState.get<number>('codegraphy.depthLimit'),
       readFolderNodeColor: () =>
         dependencies.normalizeFolderNodeColor(
@@ -91,6 +98,7 @@ export function createGraphViewProviderViewContextMethods(
       asRelativePath: uri => dependencies.asRelativePath(uri),
       defaultDepthLimit: dependencies.defaultDepthLimit,
     });
+    source._viewContext = nextViewContext;
   };
 
   const _applyViewTransform = (): void => {

@@ -5,6 +5,7 @@ import SettingsPanel from '../components/settingsPanel/Drawer';
 import PluginsPanel from '../components/plugins/Panel';
 import Toolbar from '../components/Toolbar';
 import { ActiveFileBreadcrumb } from '../components/activeFileBreadcrumb/view';
+import { DepthControl } from '../components/toolbar/DepthControl';
 import { useTheme } from '../theme/useTheme';
 import { usePluginManager } from '../pluginRuntime/useManager';
 import { useFilteredGraph } from '../search/useFilteredGraph';
@@ -69,6 +70,9 @@ export default function App(): React.ReactElement {
         <div className="absolute top-2 bottom-2 right-2 z-10 flex flex-col justify-end pointer-events-none [&>*]:pointer-events-auto">
           <PluginsPanel isOpen={activePanel === 'plugins'} onClose={() => setActivePanel('none')} />
           <SettingsPanel isOpen={activePanel === 'settings'} onClose={() => setActivePanel('none')} />
+          <div data-testid="depth-control-overlay">
+            <DepthControl />
+          </div>
         </div>
       </div>
     </div>

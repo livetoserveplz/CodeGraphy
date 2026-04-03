@@ -26,7 +26,7 @@ function setDefaultState(overrides: Record<string, unknown> = {}) {
 
 /**
  * Helper to get button groups from the toolbar DOM using data-testid attributes.
- * Layout: top controls [view-buttons] [dag-buttons] [2d/3d] [node-size-buttons] | bottom controls [depth] [refresh] [export] [plugins] [settings]
+ * Layout: top controls [view-buttons] [dag-buttons] [2d/3d] [node-size-buttons] | bottom controls [refresh] [export] [plugins] [settings]
  */
 function getButtonGroups(container: HTMLElement) {
   const viewGroup = container.querySelector('[data-testid="view-buttons"]');
@@ -233,21 +233,20 @@ describe('Toolbar', () => {
       expect(controls?.className).not.toContain('max-h-0');
     });
 
-    it('renders the depth control in the bottom toolbar group when depth view is active', () => {
+    it('does not render a depth control inside the left toolbar when depth view is active', () => {
       setDefaultState({ activeViewId: 'codegraphy.depth-graph', activeFilePath: 'src/app.ts' });
       const { container } = render(<Toolbar />);
       const topGroup = container.querySelector('[data-testid="toolbar-top-group"]') as HTMLElement | null;
       const bottomGroup = container.querySelector('[data-testid="toolbar-bottom-group"]') as HTMLElement | null;
-      const settingsRow = container.querySelector('[data-testid="toolbar-settings-row"]') as HTMLElement | null;
-      expect(bottomGroup?.querySelector('[data-testid="depth-control"]')).toBeTruthy();
-      expect(settingsRow?.querySelector('[data-testid="depth-control"]')).toBeTruthy();
+      expect(bottomGroup?.querySelector('[data-testid="depth-control"]')).toBeFalsy();
       expect(topGroup?.querySelector('[data-testid="depth-control"]')).toBeFalsy();
     });
 
-    it('displays current depth limit value', () => {
+    it('keeps the left toolbar action row free of depth controls', () => {
       setDefaultState({ activeViewId: 'codegraphy.depth-graph', depthLimit: 3, activeFilePath: 'src/app.ts' });
-      render(<Toolbar />);
-      expect(screen.getByTestId('depth-value')).toHaveTextContent('3');
+      const { container } = render(<Toolbar />);
+      const settingsRow = container.querySelector('[data-testid="toolbar-settings-row"]') as HTMLElement | null;
+      expect(settingsRow?.querySelector('[data-testid="depth-control"]')).toBeFalsy();
     });
   });
 

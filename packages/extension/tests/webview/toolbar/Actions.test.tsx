@@ -154,18 +154,11 @@ describe('ToolbarActions', () => {
     expect(refreshButton.className).toContain('w-7');
   });
 
-  it('renders the depth control inline with settings in depth view', () => {
-    graphStore.setState({
-      activeViewId: 'codegraphy.depth-graph',
-      depthLimit: 3,
-      maxDepthLimit: 5,
-      activeFilePath: 'src/app.ts',
-    });
-
+  it('keeps the settings row scoped to the settings button', () => {
     renderWithProviders();
 
     const settingsRow = screen.getByTestId('toolbar-settings-row');
-    expect(settingsRow.querySelector('[data-testid="depth-control"]')).toBeTruthy();
+    expect(settingsRow.querySelector('[data-testid="depth-control"]')).toBeFalsy();
     expect(screen.getByTitle('Settings').closest('[data-testid="toolbar-settings-row"]')).toBe(
       settingsRow,
     );

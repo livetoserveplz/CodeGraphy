@@ -19,7 +19,6 @@ import {
 } from '../ui/menus/dropdown-menu';
 import { useGraphStore } from '../../store/state';
 import { postMessage } from '../../vscodeApi';
-import { DepthControl } from './DepthControl';
 
 export function ToolbarActions(): React.ReactElement {
   const setActivePanel = useGraphStore(s => s.setActivePanel);
@@ -95,7 +94,6 @@ export function ToolbarActions(): React.ReactElement {
       </Tooltip>
 
       <div data-testid="toolbar-settings-row" className="flex items-center gap-1.5">
-        <DepthControl />
         <Tooltip>
           <TooltipTrigger asChild>
             <Button

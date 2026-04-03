@@ -19,7 +19,7 @@ export function DepthControl(): React.ReactElement | null {
   return (
     <div
       data-testid="depth-control"
-      className="flex h-7 min-w-[11rem] items-center gap-2 rounded-md border border-input bg-background px-2 shadow-sm"
+      className="flex h-7 min-w-[12rem] items-center gap-2 rounded-md border border-input/80 bg-transparent px-2 text-foreground shadow-sm backdrop-blur-[1px]"
     >
       <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
         Depth
