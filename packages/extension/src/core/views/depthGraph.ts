@@ -5,7 +5,7 @@
 
 import { IView, IViewContext } from './contracts';
 import type { IGraphData } from '../../shared/graph/types';
-import { buildAdjacencyList, bfsFromNode } from './depthTraversal';
+import { buildAdjacencyList, bfsFromNode, getMaxDepthFromNode } from './depthTraversal';
 
 export const depthGraphView: IView = {
   id: 'codegraphy.depth-graph',
@@ -14,9 +14,24 @@ export const depthGraphView: IView = {
   description: 'Focus on current file and its connections up to N levels deep',
 
   transform(data: IGraphData, context: IViewContext): IGraphData {
-    const focusedFile = context.focusedFile ?? '';
+    const focusedFile = context.focusedFile;
+    if (!focusedFile) {
+      context.maxDepthLimit = undefined;
+      return data;
+    }
+
     const adjacencyList = buildAdjacencyList(data);
-    const nodeDepths = bfsFromNode(focusedFile, context.depthLimit ?? 1, adjacencyList);
+    const maxDepthFromFocusedFile = getMaxDepthFromNode(focusedFile, adjacencyList);
+    if (maxDepthFromFocusedFile === undefined) {
+      context.maxDepthLimit = undefined;
+      return data;
+    }
+
+    const maxDepthLimit = Math.max(1, maxDepthFromFocusedFile);
+    context.maxDepthLimit = maxDepthLimit;
+    const effectiveDepthLimit = Math.max(1, Math.min(context.depthLimit ?? 1, maxDepthLimit));
+    context.depthLimit = effectiveDepthLimit;
+    const nodeDepths = bfsFromNode(focusedFile, effectiveDepthLimit, adjacencyList);
 
     const filteredNodes = data.nodes
       .filter(node => nodeDepths.has(node.id))
@@ -30,7 +45,7 @@ export const depthGraphView: IView = {
     return { nodes: filteredNodes, edges: filteredEdges };
   },
 
-  isAvailable(context: IViewContext): boolean {
-    return context.focusedFile !== undefined;
+  isAvailable(_context: IViewContext): boolean {
+    return true;
   },
 };

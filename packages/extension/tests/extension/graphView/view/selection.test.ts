@@ -99,11 +99,11 @@ describe('graphView/view/selection', () => {
     });
   });
 
-  it('clamps depth limits, persists them, and re-sends graph data in depth view', async () => {
+  it('clamps depth limits to the current max depth, persists them, and re-sends graph data in depth view', async () => {
     const state = {
       _activeViewId: 'codegraphy.depth-graph',
       _graphData: { nodes: [], edges: [] } satisfies IGraphData,
-      _viewContext: { activePlugins: new Set(), depthLimit: 1 } satisfies IViewContext,
+      _viewContext: { activePlugins: new Set(), depthLimit: 1, maxDepthLimit: 3 } satisfies IViewContext,
     };
     const persistDepthLimit = vi.fn(() => Promise.resolve());
     const sendMessage = vi.fn();
@@ -116,16 +116,40 @@ describe('graphView/view/selection', () => {
       applyViewTransform,
     });
 
-    expect(state._viewContext.depthLimit).toBe(10);
-    expect(persistDepthLimit).toHaveBeenCalledWith(10);
+    expect(state._viewContext.depthLimit).toBe(3);
+    expect(persistDepthLimit).toHaveBeenCalledWith(3);
     expect(sendMessage).toHaveBeenNthCalledWith(1, {
       type: 'DEPTH_LIMIT_UPDATED',
-      payload: { depthLimit: 10 },
+      payload: { depthLimit: 3, maxDepthLimit: 3 },
     });
     expect(applyViewTransform).toHaveBeenCalledTimes(1);
     expect(sendMessage).toHaveBeenNthCalledWith(2, {
       type: 'GRAPH_DATA_UPDATED',
       payload: { nodes: [], edges: [] },
+    });
+  });
+
+  it('keeps depth limits open-ended when there is no focused-file max depth', async () => {
+    const state = {
+      _activeViewId: 'codegraphy.connections',
+      _graphData: { nodes: [], edges: [] } satisfies IGraphData,
+      _viewContext: { activePlugins: new Set(), depthLimit: 1 } satisfies IViewContext,
+    };
+    const persistDepthLimit = vi.fn(() => Promise.resolve());
+    const sendMessage = vi.fn();
+
+    await setGraphViewDepthLimit(state, 7, {
+      persistDepthLimit,
+      sendMessage,
+      getActiveViewInfo: () => ({ view: { id: 'codegraphy.connections' } }),
+      applyViewTransform: vi.fn(),
+    });
+
+    expect(state._viewContext.depthLimit).toBe(7);
+    expect(persistDepthLimit).toHaveBeenCalledWith(7);
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: 'DEPTH_LIMIT_UPDATED',
+      payload: { depthLimit: 7, maxDepthLimit: undefined },
     });
   });
 

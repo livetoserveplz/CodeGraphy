@@ -10,7 +10,7 @@ import {
 } from '../../../../src/extension/graphView/view/broadcast';
 
 describe('graphView/view/broadcast', () => {
-  it('sends available views and the current depth limit', () => {
+  it('sends available views and the current depth state', () => {
     const viewRegistry = new ViewRegistry();
     for (const view of coreViews) {
       viewRegistry.register(view, { core: true, isDefault: view.id === 'codegraphy.connections' });
@@ -19,7 +19,7 @@ describe('graphView/view/broadcast', () => {
 
     sendGraphViewAvailableViews(
       viewRegistry,
-      { activePlugins: new Set(['plugin.alpha']), depthLimit: 3 } satisfies IViewContext,
+      { activePlugins: new Set(['plugin.alpha']), depthLimit: 3, maxDepthLimit: 5 } satisfies IViewContext,
       'codegraphy.connections',
       1,
       sendMessage,
@@ -34,7 +34,7 @@ describe('graphView/view/broadcast', () => {
     });
     expect(sendMessage).toHaveBeenNthCalledWith(2, {
       type: 'DEPTH_LIMIT_UPDATED',
-      payload: { depthLimit: 3 },
+      payload: { depthLimit: 3, maxDepthLimit: 5 },
     });
   });
 

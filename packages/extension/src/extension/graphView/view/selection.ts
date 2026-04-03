@@ -36,6 +36,13 @@ interface SetGraphViewDepthLimitDependencies {
   applyViewTransform: () => void;
 }
 
+function isDepthGraphActive(
+  activeViewId: string,
+  getActiveViewInfo: (activeViewId: string) => GraphViewViewInfoLike | undefined,
+): boolean {
+  return getActiveViewInfo(activeViewId)?.view.id === 'codegraphy.depth-graph';
+}
+
 export async function changeGraphViewView(
   state: GraphViewSelectionState,
   viewId: string,
@@ -72,6 +79,16 @@ export function setGraphViewFocusedFile(
 ): void {
   const previousFocusedFile = state._viewContext.focusedFile;
   state._viewContext.focusedFile = filePath;
+  const depthGraphActive = isDepthGraphActive(state._activeViewId, getActiveViewInfo);
+
+  if (!depthGraphActive) {
+    state._viewContext.maxDepthLimit = undefined;
+  }
+
+  if (depthGraphActive) {
+    applyViewTransform();
+    sendMessage({ type: 'GRAPH_DATA_UPDATED', payload: state._graphData });
+  }
 
   if (previousFocusedFile !== filePath) {
     sendAvailableViews();
@@ -79,11 +96,6 @@ export function setGraphViewFocusedFile(
       type: 'ACTIVE_FILE_UPDATED',
       payload: { filePath },
     });
-  }
-
-  if (getActiveViewInfo(state._activeViewId)?.view.id === 'codegraphy.depth-graph') {
-    applyViewTransform();
-    sendMessage({ type: 'GRAPH_DATA_UPDATED', payload: state._graphData });
   }
 }
 
@@ -97,16 +109,17 @@ export async function setGraphViewDepthLimit(
     applyViewTransform,
   }: SetGraphViewDepthLimitDependencies,
 ): Promise<void> {
-  const clampedDepthLimit = Math.max(1, Math.min(10, depthLimit));
+  const maxDepthLimit = state._viewContext.maxDepthLimit;
+  const clampedDepthLimit = Math.max(1, Math.min(maxDepthLimit ?? Number.POSITIVE_INFINITY, depthLimit));
   state._viewContext.depthLimit = clampedDepthLimit;
 
   await persistDepthLimit(clampedDepthLimit);
   sendMessage({
     type: 'DEPTH_LIMIT_UPDATED',
-    payload: { depthLimit: clampedDepthLimit },
+    payload: { depthLimit: clampedDepthLimit, maxDepthLimit },
   });
 
-  if (getActiveViewInfo(state._activeViewId)?.view.id === 'codegraphy.depth-graph') {
+  if (isDepthGraphActive(state._activeViewId, getActiveViewInfo)) {
     applyViewTransform();
     sendMessage({ type: 'GRAPH_DATA_UPDATED', payload: state._graphData });
   }

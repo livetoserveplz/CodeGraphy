@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { buildAdjacencyList, bfsFromNode } from '../../../src/core/views/depthTraversal';
+import {
+  buildAdjacencyList,
+  bfsFromNode,
+  getMaxDepthFromNode,
+} from '../../../src/core/views/depthTraversal';
 import type { IGraphData } from '../../../src/shared/graph/types';
 
 describe('buildAdjacencyList', () => {
@@ -201,5 +205,40 @@ describe('bfsFromNode', () => {
         ['ghost', 1],
       ]),
     );
+  });
+});
+
+describe('getMaxDepthFromNode', () => {
+  it('returns the furthest reachable depth in a linear chain', () => {
+    const adj = new Map<string, Set<string>>();
+    adj.set('a', new Set(['b']));
+    adj.set('b', new Set(['a', 'c']));
+    adj.set('c', new Set(['b']));
+
+    expect(getMaxDepthFromNode('a', adj)).toBe(2);
+  });
+
+  it('returns 0 for an isolated start node', () => {
+    const adj = new Map<string, Set<string>>();
+    adj.set('solo', new Set());
+
+    expect(getMaxDepthFromNode('solo', adj)).toBe(0);
+  });
+
+  it('handles circular loops without inflating the max depth', () => {
+    const adj = new Map<string, Set<string>>();
+    adj.set('a', new Set(['b', 'c']));
+    adj.set('b', new Set(['a', 'c']));
+    adj.set('c', new Set(['a', 'b', 'd']));
+    adj.set('d', new Set(['c']));
+
+    expect(getMaxDepthFromNode('a', adj)).toBe(2);
+  });
+
+  it('returns undefined when the start node is missing', () => {
+    const adj = new Map<string, Set<string>>();
+    adj.set('a', new Set(['b']));
+
+    expect(getMaxDepthFromNode('missing', adj)).toBeUndefined();
   });
 });

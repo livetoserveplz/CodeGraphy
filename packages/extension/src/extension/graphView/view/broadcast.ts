@@ -29,7 +29,10 @@ export function sendGraphViewAvailableViews(
   });
   sendMessage({
     type: 'DEPTH_LIMIT_UPDATED',
-    payload: { depthLimit: viewContext.depthLimit ?? defaultDepthLimit },
+    payload: {
+      depthLimit: viewContext.depthLimit ?? defaultDepthLimit,
+      maxDepthLimit: viewContext.maxDepthLimit,
+    },
   });
 }
 

@@ -59,3 +59,25 @@ export function bfsFromNode(
 
   return nodeDepths;
 }
+
+/**
+ * Returns the maximum reachable hop distance from the given start node.
+ */
+export function getMaxDepthFromNode(
+  startNode: string,
+  adjacencyList: Map<string, Set<string>>,
+): number | undefined {
+  const nodeDepths = bfsFromNode(startNode, Number.POSITIVE_INFINITY, adjacencyList);
+  if (nodeDepths.size === 0) {
+    return undefined;
+  }
+
+  let maxDepth = 0;
+  for (const depth of nodeDepths.values()) {
+    if (depth > maxDepth) {
+      maxDepth = depth;
+    }
+  }
+
+  return maxDepth;
+}

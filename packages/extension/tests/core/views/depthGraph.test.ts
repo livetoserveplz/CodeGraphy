@@ -78,16 +78,15 @@ describe('depthGraphView', () => {
       depthGraphView = mod.depthGraphView;
     });
 
-    it('returns an empty graph when no file is focused', () => {
+    it('returns the full graph when no file is focused', () => {
       const result = depthGraphView.transform(sampleData, context());
-      expect(result.nodes).toHaveLength(0);
-      expect(result.edges).toHaveLength(0);
+      expect(result).toEqual(sampleData);
     });
 
-    it('includes only the focused node at depth 0 when depth limit is 0', () => {
+    it('clamps depth limits below 1 to 1', () => {
       const result = depthGraphView.transform(sampleData, context({ focusedFile: 'a.ts', depthLimit: 0 }));
-      expect(result.nodes.map((n) => n.id)).toEqual(['a.ts']);
-      expect(result.edges).toHaveLength(0);
+      expect(result.nodes.map((n) => n.id)).toEqual(['a.ts', 'b.ts']);
+      expect(result.edges).toHaveLength(1);
     });
 
     it('includes the focused node and direct neighbors at depth limit 1', () => {
@@ -116,27 +115,41 @@ describe('depthGraphView', () => {
       }
     });
 
-    it('returns an empty graph when focused file is not in the data', () => {
+    it('falls back to the full graph when focused file is not in the data', () => {
       const result = depthGraphView.transform(sampleData, context({ focusedFile: 'nonexistent.ts', depthLimit: 1 }));
-      expect(result.nodes).toHaveLength(0);
+      expect(result).toEqual(sampleData);
     });
 
     it('is available when a file is focused', () => {
       expect(depthGraphView.isAvailable!(context({ focusedFile: 'a.ts' }))).toBe(true);
     });
 
-    it('is not available when no file is focused', () => {
-      expect(depthGraphView.isAvailable!(context())).toBe(false);
+    it('is available when no file is focused', () => {
+      expect(depthGraphView.isAvailable!(context())).toBe(true);
     });
 
-    it('returns empty nodes array when focusedFile is undefined', () => {
+    it('returns all nodes when focusedFile is undefined', () => {
       const result = depthGraphView.transform(sampleData, context({ focusedFile: undefined }));
-      expect(result.nodes).toEqual([]);
+      expect(result.nodes).toEqual(sampleData.nodes);
     });
 
-    it('returns empty edges array when focusedFile is undefined', () => {
+    it('returns all edges when focusedFile is undefined', () => {
       const result = depthGraphView.transform(sampleData, context({ focusedFile: undefined }));
-      expect(result.edges).toEqual([]);
+      expect(result.edges).toEqual(sampleData.edges);
+    });
+
+    it('publishes a selectable max depth on the view context', () => {
+      const viewContext = context({ focusedFile: 'a.ts', depthLimit: 99 });
+      depthGraphView.transform(sampleData, viewContext);
+      expect(viewContext.maxDepthLimit).toBe(3);
+      expect(viewContext.depthLimit).toBe(3);
+    });
+
+    it('clears the max depth when no file is focused', () => {
+      const viewContext = context({ depthLimit: 4, maxDepthLimit: 2 });
+      depthGraphView.transform(sampleData, viewContext);
+      expect(viewContext.maxDepthLimit).toBeUndefined();
+      expect(viewContext.depthLimit).toBe(4);
     });
   });
 });

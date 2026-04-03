@@ -95,6 +95,12 @@ export interface IViewContext {
    */
   depthLimit?: number;
 
+  /**
+   * Maximum selectable depth for the currently focused file.
+   * Undefined when no focused file is available for depth-limited views.
+   */
+  maxDepthLimit?: number;
+
   /** Color for folder nodes in folder view. */
   folderNodeColor?: string;
 }

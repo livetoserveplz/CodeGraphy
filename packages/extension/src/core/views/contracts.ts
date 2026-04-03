@@ -110,6 +110,12 @@ export interface IViewContext {
    */
   depthLimit?: number;
 
+  /**
+   * Maximum selectable depth for the current focused file, if one is known.
+   * Views can use this to clamp the depth slider to reachable graph depth.
+   */
+  maxDepthLimit?: number;
+
   /** Color for folder nodes in folder view. */
   folderNodeColor?: string;
 }
