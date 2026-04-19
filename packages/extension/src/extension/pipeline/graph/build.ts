@@ -1,6 +1,7 @@
 import type { IProjectedConnection, IPlugin } from '../../../core/plugins/types/contracts';
 import type { IGraphData } from '../../../shared/graph/contracts';
 import { buildWorkspaceGraphData } from './data';
+import type { MonorepoImportMap } from './monorepoImportMap/resolve';
 
 const VISITS_KEY = 'codegraphy.fileVisits';
 
@@ -25,6 +26,7 @@ export interface WorkspacePipelineGraphDependencies {
   disabledPlugins: ReadonlySet<string>;
   fileConnections: ReadonlyMap<string, IProjectedConnection[]>;
   getPluginForFile: (absolutePath: string) => IPlugin | undefined;
+  monorepoImportMap?: MonorepoImportMap;
   showOrphans: boolean;
   workspaceRoot: string;
   workspaceState: WorkspacePipelineGraphWorkspaceState;
@@ -42,6 +44,7 @@ export function buildWorkspacePipelineGraph(
     fileConnections: dependencies.fileConnections,
     showOrphans: dependencies.showOrphans,
     visitCounts,
+    monorepoImportMap: dependencies.monorepoImportMap ?? {},
     workspaceRoot: dependencies.workspaceRoot,
     getPluginForFile: dependencies.getPluginForFile,
   });
@@ -53,12 +56,14 @@ export function buildWorkspacePipelineGraphForSource(
   workspaceRoot: string,
   showOrphans: boolean,
   disabledPlugins: Set<string>,
+  monorepoImportMap: MonorepoImportMap = {},
 ): IGraphData {
   return buildWorkspacePipelineGraph({
     cacheFiles: source._cache.files,
     disabledPlugins,
     fileConnections,
     getPluginForFile: absolutePath => source._registry.getPluginForFile(absolutePath),
+    monorepoImportMap,
     showOrphans,
     workspaceRoot,
     workspaceState: source._context.workspaceState,

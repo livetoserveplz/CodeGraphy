@@ -39,6 +39,7 @@ function createStableListSettings(settings: Partial<ICodeGraphyRepoSettings>) {
   return {
     include: settings.include ?? [],
     filterPatterns: settings.filterPatterns ?? [],
+    monorepoImportMap: sortRecord(settings.monorepoImportMap ?? {}),
     pluginOrder: settings.pluginOrder ?? [],
   };
 }

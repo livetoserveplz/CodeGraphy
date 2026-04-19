@@ -93,4 +93,25 @@ describe('pipeline/graph/edgeTargets', () => {
       ),
     ).toBe('pkg:@scope/pkg');
   });
+
+  it('resolves unresolved bare package imports through the configured monorepo map', () => {
+    const connection: IProjectedConnection = {
+      kind: 'type-import',
+      resolvedPath: null,
+      sourceId: 'type-import',
+      specifier: '@codegraphy-vscode/plugin-api',
+    };
+
+    expect(
+      getConnectionTargetId(
+        createPlugin('codegraphy.treesitter'),
+        connection,
+        new Map([['packages/plugin-api/src/index.ts', []]]),
+        '/workspace',
+        {
+          '@codegraphy-vscode/plugin-api': 'packages/plugin-api/src/index.ts',
+        },
+      ),
+    ).toBe('packages/plugin-api/src/index.ts');
+  });
 });

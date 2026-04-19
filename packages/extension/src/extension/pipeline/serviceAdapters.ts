@@ -7,6 +7,7 @@ import type { IProjectedConnection } from '../../core/plugins/types/contracts';
 import type { IGraphData } from '../../shared/graph/contracts';
 import type { IWorkspaceAnalysisCache } from './cache';
 import type { IWorkspaceFileAnalysisResult } from './fileAnalysis';
+import type { MonorepoImportMap } from './graph/monorepoImportMap/resolve';
 import {
   analyzeWorkspacePipelineSourceFiles,
   type WorkspacePipelineFilesSource,
@@ -79,6 +80,7 @@ export function buildWorkspacePipelineGraphData(
   workspaceRoot: string,
   showOrphans: boolean,
   disabledPlugins: Set<string> = new Set(),
+  monorepoImportMap: MonorepoImportMap = {},
 ): IGraphData {
   const source: WorkspacePipelineGraphSource = {
     _cache: cache,
@@ -92,6 +94,7 @@ export function buildWorkspacePipelineGraphData(
     workspaceRoot,
     showOrphans,
     disabledPlugins,
+    monorepoImportMap,
   );
 }
 

@@ -7,11 +7,13 @@ import type { IProjectedConnection, IPlugin } from '../../../core/plugins/types/
 import type { IGraphData } from '../../../shared/graph/contracts';
 import { buildWorkspaceGraphEdges } from './edges';
 import { buildWorkspaceGraphNodes } from './nodes';
+import type { MonorepoImportMap } from './monorepoImportMap/resolve';
 
 export interface IWorkspaceGraphDataOptions {
   cacheFiles: Record<string, { size?: number }>;
   disabledPlugins: ReadonlySet<string>;
   fileConnections: ReadonlyMap<string, IProjectedConnection[]>;
+  monorepoImportMap?: MonorepoImportMap;
   showOrphans: boolean;
   visitCounts: Record<string, number>;
   workspaceRoot: string;
@@ -25,6 +27,7 @@ export function buildWorkspaceGraphData(options: IWorkspaceGraphDataOptions): IG
     fileConnections,
     showOrphans,
     visitCounts,
+    monorepoImportMap = {},
     workspaceRoot,
     getPluginForFile,
   } = options;
@@ -33,6 +36,7 @@ export function buildWorkspaceGraphData(options: IWorkspaceGraphDataOptions): IG
     disabledPlugins,
     fileConnections,
     getPluginForFile,
+    monorepoImportMap,
     workspaceRoot,
   });
   const nodes = buildWorkspaceGraphNodes({

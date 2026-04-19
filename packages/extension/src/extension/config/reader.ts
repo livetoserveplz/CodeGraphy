@@ -65,6 +65,14 @@ export class Configuration {
   }
 
   /**
+   * Bare import specifiers mapped to workspace-local files or package roots.
+   * @default {}
+   */
+  get monorepoImportMap(): Record<string, string> {
+    return this.config.get<Record<string, string>>('monorepoImportMap', {});
+  }
+
+  /**
    * Whether to show orphan nodes (files with no imports and not imported by others).
    * @default true
    */
@@ -147,6 +155,7 @@ export class Configuration {
       maxFiles: this.maxFiles,
       include: this.include,
       respectGitignore: this.respectGitignore,
+      monorepoImportMap: this.monorepoImportMap,
       showOrphans: this.showOrphans,
       bidirectionalEdges: this.bidirectionalEdges,
       plugins: this.plugins,

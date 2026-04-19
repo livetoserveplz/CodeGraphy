@@ -116,6 +116,7 @@ describe('Configuration', () => {
         maxFiles: 500,
         include: ['**/*'],
         respectGitignore: true,
+        monorepoImportMap: {},
         showOrphans: true,
         bidirectionalEdges: 'separate',
         plugins: [],

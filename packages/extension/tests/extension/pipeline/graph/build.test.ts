@@ -35,6 +35,7 @@ describe('pipeline/graph', () => {
       disabledPlugins: new Set<string>(['plugin.python']),
       fileConnections: new Map([['src/index.ts', []]]),
       getPluginForFile: expect.any(Function),
+      monorepoImportMap: {},
       showOrphans: true,
       visitCounts: { 'src/index.ts': 3 },
       workspaceRoot: '/workspace',

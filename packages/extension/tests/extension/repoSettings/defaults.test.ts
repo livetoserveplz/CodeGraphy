@@ -15,6 +15,7 @@ describe('extension/repoSettings/defaults', () => {
       maxFiles: 500,
       include: ['**/*'],
       respectGitignore: true,
+      monorepoImportMap: {},
       showOrphans: true,
       plugins: [],
       pluginOrder: [],
@@ -58,6 +59,7 @@ describe('extension/repoSettings/defaults', () => {
     expect(second).toEqual(first);
     expect(second).not.toBe(first);
     expect(second.include).not.toBe(first.include);
+    expect(second.monorepoImportMap).not.toBe(first.monorepoImportMap);
     expect(second.plugins).not.toBe(first.plugins);
     expect(second.pluginOrder).not.toBe(first.pluginOrder);
     expect(second.disabledPlugins).not.toBe(first.disabledPlugins);

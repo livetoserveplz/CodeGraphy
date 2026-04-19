@@ -9,11 +9,13 @@ import type { IGraphEdge } from '../../../shared/graph/contracts';
 import { createGraphEdgeId } from '../../../shared/graph/edgeIdentity';
 import { createEdgeSource } from './edgeSources';
 import { getConnectionTargetId } from './edgeTargets';
+import type { MonorepoImportMap } from './monorepoImportMap/resolve';
 
 export interface IWorkspaceGraphEdgesOptions {
   disabledPlugins: ReadonlySet<string>;
   fileConnections: ReadonlyMap<string, IProjectedConnection[]>;
   getPluginForFile: (absolutePath: string) => IPlugin | undefined;
+  monorepoImportMap?: MonorepoImportMap;
   workspaceRoot: string;
 }
 
@@ -43,6 +45,7 @@ function appendConnectionEdge(
     edgeMap: Map<string, IGraphEdge>;
     edges: IGraphEdge[];
     fileConnections: ReadonlyMap<string, IProjectedConnection[]>;
+    monorepoImportMap: MonorepoImportMap;
     nodeIds: Set<string>;
     plugin: IPlugin | undefined;
     workspaceRoot: string;
@@ -58,6 +61,7 @@ function appendConnectionEdge(
     connection,
     options.fileConnections,
     options.workspaceRoot,
+    options.monorepoImportMap,
   );
   if (!targetId) {
     return;
@@ -100,6 +104,7 @@ export function buildWorkspaceGraphEdges(
     disabledPlugins,
     fileConnections,
     getPluginForFile,
+    monorepoImportMap = {},
     workspaceRoot,
   } = options;
 
@@ -120,6 +125,7 @@ export function buildWorkspaceGraphEdges(
         edgeMap,
         edges,
         fileConnections,
+        monorepoImportMap,
         nodeIds,
         plugin,
         workspaceRoot,

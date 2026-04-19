@@ -3,6 +3,7 @@ import type { IFileAnalysisResult, IProjectedConnection } from '../../../../core
 import type { PluginRegistry } from '../../../../core/plugins/registry/manager';
 import type { IGraphData } from '../../../../shared/graph/contracts';
 import type { IWorkspaceAnalysisCache } from '../../cache';
+import type { MonorepoImportMap } from '../../graph/monorepoImportMap/resolve';
 import { projectConnectionMapFromFileAnalysis } from '../../projection';
 import { buildWorkspacePipelineGraphData } from '../../serviceAdapters';
 
@@ -14,6 +15,7 @@ export function buildWorkspacePipelineGraph(
   workspaceRoot: string,
   showOrphans: boolean,
   disabledPlugins: Set<string>,
+  monorepoImportMap: MonorepoImportMap = {},
 ): IGraphData {
   return buildWorkspacePipelineGraphData(
     cache,
@@ -23,6 +25,7 @@ export function buildWorkspacePipelineGraph(
     workspaceRoot,
     showOrphans,
     disabledPlugins,
+    monorepoImportMap,
   );
 }
 
@@ -34,6 +37,7 @@ export function buildWorkspacePipelineGraphFromAnalysis(
   workspaceRoot: string,
   showOrphans: boolean,
   disabledPlugins: Set<string>,
+  monorepoImportMap: MonorepoImportMap = {},
 ): IGraphData {
   return buildWorkspacePipelineGraph(
     cache,
@@ -43,5 +47,6 @@ export function buildWorkspacePipelineGraphFromAnalysis(
     workspaceRoot,
     showOrphans,
     disabledPlugins,
+    monorepoImportMap,
   );
 }

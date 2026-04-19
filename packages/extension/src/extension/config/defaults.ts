@@ -31,6 +31,8 @@ export interface ICodeGraphyConfig {
   include: string[];
   /** Whether to respect .gitignore patterns */
   respectGitignore: boolean;
+  /** Map bare import specifiers to workspace-local files or package roots */
+  monorepoImportMap: Record<string, string>;
   /** Whether to show orphan nodes (files with no connections) */
   showOrphans: boolean;
   /** How to display bidirectional connections */

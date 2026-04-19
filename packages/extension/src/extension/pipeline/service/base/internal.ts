@@ -81,6 +81,7 @@ export abstract class WorkspacePipelineInternalBase extends WorkspacePipelineSta
       workspaceRoot,
       showOrphans,
       disabledPlugins,
+      this._config.monorepoImportMap,
     );
   }
 
@@ -98,6 +99,7 @@ export abstract class WorkspacePipelineInternalBase extends WorkspacePipelineSta
       workspaceRoot,
       showOrphans,
       disabledPlugins,
+      this._config.monorepoImportMap,
     );
   }
 

@@ -13,6 +13,7 @@ export interface ICodeGraphyRepoSettings {
   maxFiles: number;
   include: string[];
   respectGitignore: boolean;
+  monorepoImportMap: Record<string, string>;
   showOrphans: boolean;
   plugins: string[];
   pluginOrder: string[];
@@ -54,6 +55,7 @@ export function createDefaultCodeGraphyRepoSettings(): ICodeGraphyRepoSettings {
     maxFiles: 500,
     include: ['**/*'],
     respectGitignore: true,
+    monorepoImportMap: {},
     showOrphans: true,
     plugins: [],
     pluginOrder: [],

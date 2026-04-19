@@ -62,6 +62,9 @@ describe('extension/repoSettings/signatures', () => {
     changed.maxFiles = 900;
     changed.include = ['src/**/*.ts'];
     changed.filterPatterns = ['**/*.png'];
+    changed.monorepoImportMap = {
+      '@codegraphy-vscode/plugin-api': 'packages/plugin-api/src/index.ts',
+    };
     changed.pluginOrder = ['codegraphy.typescript'];
 
     expect(createCodeGraphySettingsSignature(changed)).not.toBe(
@@ -77,6 +80,7 @@ describe('extension/repoSettings/signatures', () => {
       depthLimit: 1,
       include: [],
       filterPatterns: [],
+      monorepoImportMap: [],
       pluginOrder: [],
       nodeVisibility: [],
       edgeVisibility: [],
@@ -91,6 +95,9 @@ describe('extension/repoSettings/signatures', () => {
       depthLimit: 4,
       include: ['src/**/*.ts'],
       filterPatterns: ['**/*.png'],
+      monorepoImportMap: {
+        '@codegraphy-vscode/plugin-api': 'packages/plugin-api/src/index.ts',
+      },
       pluginOrder: ['codegraphy.typescript'],
       nodeVisibility: { package: false, file: true },
       edgeVisibility: { import: false, call: true },
@@ -101,6 +108,9 @@ describe('extension/repoSettings/signatures', () => {
       depthLimit: 4,
       include: ['src/**/*.ts'],
       filterPatterns: ['**/*.png'],
+      monorepoImportMap: [
+        ['@codegraphy-vscode/plugin-api', 'packages/plugin-api/src/index.ts'],
+      ],
       pluginOrder: ['codegraphy.typescript'],
       nodeVisibility: [
         ['file', true],

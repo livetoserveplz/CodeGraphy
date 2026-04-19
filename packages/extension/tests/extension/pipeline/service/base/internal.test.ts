@@ -92,6 +92,9 @@ class TestInternalBase extends WorkspacePipelineInternalBase {
 
   _config = {
     getAll: vi.fn(() => ({ pluginOrder: ['plugin.a', 'plugin.b'] })),
+    monorepoImportMap: {
+      '@codegraphy-vscode/plugin-api': 'packages/plugin-api/src/index.ts',
+    },
   } as unknown as Configuration;
 
   _registry = {
@@ -309,6 +312,9 @@ describe('extension/pipeline/service/internalBase', () => {
       '/workspace',
       true,
       disabledPlugins,
+      {
+        '@codegraphy-vscode/plugin-api': 'packages/plugin-api/src/index.ts',
+      },
     );
 
     expect(
@@ -330,6 +336,9 @@ describe('extension/pipeline/service/internalBase', () => {
       '/workspace',
       false,
       disabledPlugins,
+      {
+        '@codegraphy-vscode/plugin-api': 'packages/plugin-api/src/index.ts',
+      },
     );
   });
 
