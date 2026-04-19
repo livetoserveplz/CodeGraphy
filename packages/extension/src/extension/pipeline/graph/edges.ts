@@ -9,12 +9,14 @@ import type { IGraphEdge } from '../../../shared/graph/contracts';
 import { createGraphEdgeId } from '../../../shared/graph/edgeIdentity';
 import { createEdgeSource } from './edgeSources';
 import { getConnectionTargetId } from './edgeTargets';
+import type { WorkspacePackageRegistry } from './workspacePackages/registry';
 
 export interface IWorkspaceGraphEdgesOptions {
   disabledPlugins: ReadonlySet<string>;
   fileConnections: ReadonlyMap<string, IProjectedConnection[]>;
   getPluginForFile: (absolutePath: string) => IPlugin | undefined;
   workspaceRoot: string;
+  workspacePackages?: WorkspacePackageRegistry;
 }
 
 export interface IWorkspaceGraphEdgeBuildResult {
@@ -46,6 +48,7 @@ function appendConnectionEdge(
     nodeIds: Set<string>;
     plugin: IPlugin | undefined;
     workspaceRoot: string;
+    workspacePackages: WorkspacePackageRegistry;
   },
 ): void {
   const sourcePluginId = connection.pluginId ?? options.plugin?.id;
@@ -58,6 +61,7 @@ function appendConnectionEdge(
     connection,
     options.fileConnections,
     options.workspaceRoot,
+    options.workspacePackages,
   );
   if (!targetId) {
     return;
@@ -101,6 +105,7 @@ export function buildWorkspaceGraphEdges(
     fileConnections,
     getPluginForFile,
     workspaceRoot,
+    workspacePackages = new Map(),
   } = options;
 
   const connectedIds = new Set<string>();
@@ -123,6 +128,7 @@ export function buildWorkspaceGraphEdges(
         nodeIds,
         plugin,
         workspaceRoot,
+        workspacePackages,
       });
     }
   }

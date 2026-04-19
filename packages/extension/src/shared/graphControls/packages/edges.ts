@@ -1,6 +1,6 @@
 import type { IGraphData } from '../../graph/contracts';
 import { STRUCTURAL_NESTS_EDGE_KIND } from '../defaults/definitions';
-import { getNearestWorkspacePackageRoot } from './roots';
+import { getWorkspacePackageRootFromManifest, isWorkspacePackageManifestPath } from './roots';
 import { getWorkspacePackageNodeId, isFileNode } from './workspace';
 
 export function buildWorkspacePackageEdges(
@@ -14,8 +14,12 @@ export function buildWorkspacePackageEdges(
       continue;
     }
 
-    const packageRoot = getNearestWorkspacePackageRoot(node.id, packageRoots);
-    if (!packageRoot) {
+    if (!isWorkspacePackageManifestPath(node.id)) {
+      continue;
+    }
+
+    const packageRoot = getWorkspacePackageRootFromManifest(node.id);
+    if (!packageRoots.has(packageRoot)) {
       continue;
     }
 

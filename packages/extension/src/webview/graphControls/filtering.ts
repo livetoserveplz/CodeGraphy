@@ -37,7 +37,12 @@ export function applyGraphControls({
     workspacePackageRoots,
   } = buildStructuralGraphNodes(getFileNodes(baseNodes), nodeVisibility, nodeColors);
 
-  const nodes = [...visibleBaseNodes, ...folderNodes, ...packageNodes];
+  const visibleBaseNodeIds = new Set(visibleBaseNodes.map(node => node.id));
+  const nodes = [
+    ...visibleBaseNodes,
+    ...folderNodes,
+    ...packageNodes.filter(node => !visibleBaseNodeIds.has(node.id)),
+  ];
   const visibleNodeIds = new Set(nodes.map((node) => node.id));
   const visibleFileNodes = getFileNodes(visibleBaseNodes);
   const semanticEdges = filterSemanticEdges(graphData.edges, visibleNodeIds, edgeVisibility);

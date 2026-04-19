@@ -37,7 +37,7 @@ describe('shared/graphControls/packages', () => {
     ]);
   });
 
-  it('builds nests edges from the nearest workspace package to each visible file', () => {
+  it('builds nests edges from workspace package nodes to their package manifests', () => {
     expect(buildWorkspacePackageEdges(
       new Set(['.', 'packages/extension']),
       [
@@ -58,20 +58,6 @@ describe('shared/graphControls/packages', () => {
         id: `${WORKSPACE_PACKAGE_NODE_ID_PREFIX}packages/extension->packages/extension/package.json#codegraphy:nests`,
         from: `${WORKSPACE_PACKAGE_NODE_ID_PREFIX}packages/extension`,
         to: 'packages/extension/package.json',
-        kind: 'codegraphy:nests',
-        sources: [],
-      },
-      {
-        id: `${WORKSPACE_PACKAGE_NODE_ID_PREFIX}packages/extension->packages/extension/src/index.ts#codegraphy:nests`,
-        from: `${WORKSPACE_PACKAGE_NODE_ID_PREFIX}packages/extension`,
-        to: 'packages/extension/src/index.ts',
-        kind: 'codegraphy:nests',
-        sources: [],
-      },
-      {
-        id: `${WORKSPACE_PACKAGE_NODE_ID_PREFIX}.->packages/plugin-api/src/api.ts#codegraphy:nests`,
-        from: `${WORKSPACE_PACKAGE_NODE_ID_PREFIX}.`,
-        to: 'packages/plugin-api/src/api.ts',
         kind: 'codegraphy:nests',
         sources: [],
       },

@@ -1,4 +1,7 @@
 {
   "name": "@codegraphy/example-app",
-  "private": true
+  "private": true,
+  "dependencies": {
+    "@codegraphy/example-shared": "workspace:*"
+  }
 }

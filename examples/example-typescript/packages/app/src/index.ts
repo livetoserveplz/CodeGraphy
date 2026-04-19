@@ -1,5 +1,5 @@
-import { formatUser } from '../../shared/src/types';
-import type { UserName } from '../../shared/src/types';
+import { formatUser } from '@codegraphy/example-shared';
+import type { UserName } from '@codegraphy/example-shared';
 import { buildGreeting } from './utils';
 
 const currentUser: UserName = formatUser('CodeGraphy');

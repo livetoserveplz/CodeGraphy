@@ -8,6 +8,11 @@ import { DEFAULT_NODE_COLOR } from '../../../shared/fileColors';
 import type { IGraphNode } from '../../../shared/graph/contracts';
 import { DEFAULT_PACKAGE_NODE_COLOR } from '../../../shared/fileColors';
 import {
+  getWorkspacePackageLabel,
+  getWorkspacePackageRootFromNodeId,
+  isWorkspacePackageNodeId,
+} from '../../../shared/graphControls/packages/workspace';
+import {
   getExternalPackageLabelFromNodeId,
   isExternalPackageNodeId,
 } from './packageSpecifiers/nodeId';
@@ -35,6 +40,19 @@ export function buildWorkspaceGraphNodes(
 
   for (const filePath of nodeIds) {
     if (!showOrphans && !connectedIds.has(filePath)) {
+      continue;
+    }
+
+    if (isWorkspacePackageNodeId(filePath)) {
+      nodes.push({
+        id: filePath,
+        label: getWorkspacePackageLabel(getWorkspacePackageRootFromNodeId(filePath)),
+        color: DEFAULT_PACKAGE_NODE_COLOR,
+        nodeType: 'package',
+        shape2D: 'hexagon',
+        shape3D: 'cube',
+        accessCount: 0,
+      });
       continue;
     }
 

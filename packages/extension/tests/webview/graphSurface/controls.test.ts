@@ -125,13 +125,6 @@ describe('webview/graphSurface/controls', () => {
             kind: STRUCTURAL_NESTS_EDGE_KIND,
             sources: [],
           },
-          {
-            id: `${WORKSPACE_PACKAGE_NODE_ID_PREFIX}packages/extension->packages/extension/src/index.ts#${STRUCTURAL_NESTS_EDGE_KIND}`,
-            from: `${WORKSPACE_PACKAGE_NODE_ID_PREFIX}packages/extension`,
-            to: 'packages/extension/src/index.ts',
-            kind: STRUCTURAL_NESTS_EDGE_KIND,
-            sources: [],
-          },
         ],
       },
       edgeDecorations: {
@@ -141,11 +134,43 @@ describe('webview/graphSurface/controls', () => {
         [`${WORKSPACE_PACKAGE_NODE_ID_PREFIX}packages/extension->packages/extension/package.json#${STRUCTURAL_NESTS_EDGE_KIND}`]: {
           color: '#222222',
         },
-        [`${WORKSPACE_PACKAGE_NODE_ID_PREFIX}packages/extension->packages/extension/src/index.ts#${STRUCTURAL_NESTS_EDGE_KIND}`]: {
-          color: '#222222',
-        },
       },
     });
+  });
+
+  it('does not duplicate workspace package nodes already present in graph data', () => {
+    const packageGraphData: IGraphData = {
+      nodes: [
+        { id: 'packages/shared/package.json', label: 'package.json', color: '#111111', nodeType: 'file' },
+        {
+          id: `${WORKSPACE_PACKAGE_NODE_ID_PREFIX}packages/shared`,
+          label: 'shared',
+          color: '#111111',
+          nodeType: 'package',
+        },
+      ],
+      edges: [
+        {
+          id: `packages/app/src/index.ts->${WORKSPACE_PACKAGE_NODE_ID_PREFIX}packages/shared#import`,
+          from: 'packages/app/src/index.ts',
+          to: `${WORKSPACE_PACKAGE_NODE_ID_PREFIX}packages/shared`,
+          kind: 'import',
+          sources: [],
+        },
+      ],
+    };
+
+    const result = applyGraphControls({
+      graphData: packageGraphData,
+      nodeColors: { file: '#111111', package: '#F59E0B' },
+      nodeVisibility: { file: true, folder: false, package: true },
+      edgeVisibility: { [STRUCTURAL_NESTS_EDGE_KIND]: true, import: true },
+      edgeColors: {},
+    });
+
+    expect(
+      result.graphData?.nodes.filter(node => node.id === `${WORKSPACE_PACKAGE_NODE_ID_PREFIX}packages/shared`),
+    ).toHaveLength(1);
   });
 
   it('returns null when no graph data is available', () => {

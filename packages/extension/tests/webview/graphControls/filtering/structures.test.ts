@@ -159,7 +159,7 @@ describe('webview/graphControls/filtering/structures', () => {
 
     expect(packageOnly.every(edge => edge.kind === STRUCTURAL_NESTS_EDGE_KIND)).toBe(true);
     expect(packageOnly.some(edge => edge.from === `${WORKSPACE_PACKAGE_NODE_ID_PREFIX}.` && edge.to === 'package.json')).toBe(true);
-    expect(packageOnly.some(edge => edge.from === `${WORKSPACE_PACKAGE_NODE_ID_PREFIX}.` && edge.to === 'packages/extension/src/index.ts')).toBe(true);
+    expect(packageOnly.some(edge => edge.from === `${WORKSPACE_PACKAGE_NODE_ID_PREFIX}.` && edge.to === 'packages/extension/src/index.ts')).toBe(false);
     expect(packageOnly.some(edge => edge.from === '(root)' || edge.from === 'packages')).toBe(false);
   });
 });

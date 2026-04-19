@@ -7,6 +7,7 @@ import type { IProjectedConnection, IPlugin } from '../../../core/plugins/types/
 import type { IGraphData } from '../../../shared/graph/contracts';
 import { buildWorkspaceGraphEdges } from './edges';
 import { buildWorkspaceGraphNodes } from './nodes';
+import { buildWorkspacePackageRegistry } from './workspacePackages/registry';
 
 export interface IWorkspaceGraphDataOptions {
   cacheFiles: Record<string, { size?: number }>;
@@ -28,12 +29,14 @@ export function buildWorkspaceGraphData(options: IWorkspaceGraphDataOptions): IG
     workspaceRoot,
     getPluginForFile,
   } = options;
+  const workspacePackages = buildWorkspacePackageRegistry(fileConnections.keys(), workspaceRoot);
 
   const { connectedIds, edges, nodeIds } = buildWorkspaceGraphEdges({
     disabledPlugins,
     fileConnections,
     getPluginForFile,
     workspaceRoot,
+    workspacePackages,
   });
   const nodes = buildWorkspaceGraphNodes({
     cacheFiles,

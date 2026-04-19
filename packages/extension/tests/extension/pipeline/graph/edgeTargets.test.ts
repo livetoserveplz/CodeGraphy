@@ -93,4 +93,29 @@ describe('pipeline/graph/edgeTargets', () => {
       ),
     ).toBe('pkg:@scope/pkg');
   });
+
+  it('returns local workspace package node ids for unresolved imports that match discovered package names', () => {
+    const connection: IProjectedConnection = {
+      kind: 'type-import',
+      resolvedPath: null,
+      sourceId: 'type-import',
+      specifier: '@scope/pkg/subpath',
+    };
+
+    expect(
+      getConnectionTargetId(
+        createPlugin('codegraphy.anything'),
+        connection,
+        new Map(),
+        '/workspace',
+        new Map([
+          ['@scope/pkg', {
+            name: '@scope/pkg',
+            nodeId: 'pkg:workspace:packages/pkg',
+            rootPath: 'packages/pkg',
+          }],
+        ]),
+      ),
+    ).toBe('pkg:workspace:packages/pkg');
+  });
 });

@@ -1,3 +1,6 @@
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import type { IProjectedConnection, IPlugin } from '../../../../src/core/plugins/types/contracts';
 import { DEFAULT_NODE_COLOR } from '../../../../src/shared/fileColors';
@@ -297,6 +300,91 @@ describe('pipeline/graph/data', () => {
             pluginId: 'codegraphy.typescript',
             sourceId: 'es6-import',
             label: 'ES6 import',
+          },
+        ],
+      },
+    ]);
+  });
+
+  it('targets local workspace package nodes for unresolved imports whose package name is discovered locally', () => {
+    const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'codegraphy-local-package-'));
+    fs.mkdirSync(path.join(workspaceRoot, 'packages/shared'), { recursive: true });
+    fs.writeFileSync(
+      path.join(workspaceRoot, 'packages/shared/package.json'),
+      JSON.stringify({ name: '@scope/shared' }),
+      'utf8',
+    );
+
+    const graph = (() => {
+      try {
+        return buildWorkspaceGraphData({
+          cacheFiles: {
+            'packages/app/src/index.ts': { size: 10 },
+            'packages/shared/package.json': { size: 20 },
+          },
+          disabledPlugins: new Set(),
+          fileConnections: new Map<string, IProjectedConnection[]>([
+            ['packages/app/src/index.ts', [
+              { specifier: '@scope/shared', resolvedPath: null, kind: 'type-import', sourceId: 'type-import' },
+            ]],
+            ['packages/shared/package.json', []],
+            ['packages/shared/src/types.ts', []],
+          ]),
+          showOrphans: true,
+          visitCounts: {},
+          workspaceRoot,
+          getPluginForFile: () => createPlugin('codegraphy.typescript'),
+        });
+      } finally {
+        fs.rmSync(workspaceRoot, { recursive: true, force: true });
+      }
+    })();
+
+    expect(graph.nodes).toEqual([
+      {
+        id: 'packages/app/src/index.ts',
+        label: 'index.ts',
+        color: DEFAULT_NODE_COLOR,
+        fileSize: 10,
+        accessCount: 0,
+      },
+      {
+        id: 'pkg:workspace:packages/shared',
+        label: 'shared',
+        color: '#F59E0B',
+        nodeType: 'package',
+        shape2D: 'hexagon',
+        shape3D: 'cube',
+        fileSize: undefined,
+        accessCount: 0,
+      },
+      {
+        id: 'packages/shared/package.json',
+        label: 'package.json',
+        color: DEFAULT_NODE_COLOR,
+        fileSize: 20,
+        accessCount: 0,
+      },
+      {
+        id: 'packages/shared/src/types.ts',
+        label: 'types.ts',
+        color: DEFAULT_NODE_COLOR,
+        fileSize: undefined,
+        accessCount: 0,
+      },
+    ]);
+    expect(graph.edges).toEqual([
+      {
+        id: 'packages/app/src/index.ts->pkg:workspace:packages/shared#type-import',
+        from: 'packages/app/src/index.ts',
+        to: 'pkg:workspace:packages/shared',
+        kind: 'type-import',
+        sources: [
+          {
+            id: 'codegraphy.typescript:type-import',
+            pluginId: 'codegraphy.typescript',
+            sourceId: 'type-import',
+            label: 'type-import',
           },
         ],
       },

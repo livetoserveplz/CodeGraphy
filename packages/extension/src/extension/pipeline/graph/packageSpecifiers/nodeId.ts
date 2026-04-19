@@ -1,4 +1,5 @@
 import { getExternalPackageName } from './name';
+import { isWorkspacePackageNodeId } from '../../../../shared/graphControls/packages/workspace';
 
 export const PACKAGE_NODE_ID_PREFIX = 'pkg:';
 
@@ -8,7 +9,7 @@ export function getExternalPackageNodeId(specifier: string): string | null {
 }
 
 export function isExternalPackageNodeId(nodeId: string): boolean {
-  return nodeId.startsWith(PACKAGE_NODE_ID_PREFIX);
+  return nodeId.startsWith(PACKAGE_NODE_ID_PREFIX) && !isWorkspacePackageNodeId(nodeId);
 }
 
 export function getExternalPackageLabelFromNodeId(nodeId: string): string {

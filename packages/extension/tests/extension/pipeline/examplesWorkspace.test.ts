@@ -82,8 +82,8 @@ describe('WorkspacePipeline examples workspace', { timeout: 30000 }, () => {
       'example-markdown/notes/Home.md->example-markdown/src/commented.ts#reference:static',
       'example-markdown/src/commented.ts->example-markdown/notes/Architecture.md#reference:static',
       'example-typescript/packages/app/src/index.ts->example-typescript/packages/app/src/utils.ts#import',
-      'example-typescript/packages/app/src/index.ts->example-typescript/packages/shared/src/types.ts#import',
-      'example-typescript/packages/app/src/index.ts->example-typescript/packages/shared/src/types.ts#type-import',
+      'example-typescript/packages/app/src/index.ts->pkg:workspace:example-typescript/packages/shared#import',
+      'example-typescript/packages/app/src/index.ts->pkg:workspace:example-typescript/packages/shared#type-import',
       'example-typescript/packages/app/src/utils.ts->example-typescript/packages/feature-depth/src/deep.ts#import',
     ];
 
@@ -102,6 +102,7 @@ describe('WorkspacePipeline examples workspace', { timeout: 30000 }, () => {
         'example-typescript/packages/app/src/utils.ts',
         'example-typescript/packages/feature-depth/src/deep.ts',
         'example-typescript/packages/feature-depth/src/leaf.ts',
+        'example-typescript/packages/shared/package.json',
         'example-typescript/packages/shared/src/types.ts',
       ]),
     );

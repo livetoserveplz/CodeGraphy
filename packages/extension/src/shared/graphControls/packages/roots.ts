@@ -1,11 +1,11 @@
 import type { IGraphData } from '../../graph/contracts';
 import { isFileNode } from './workspace';
 
-function isPackageManifestPath(nodeId: string): boolean {
+export function isWorkspacePackageManifestPath(nodeId: string): boolean {
   return nodeId === 'package.json' || nodeId.endsWith('/package.json');
 }
 
-function getWorkspacePackageRootFromManifest(nodeId: string): string {
+export function getWorkspacePackageRootFromManifest(nodeId: string): string {
   return nodeId === 'package.json'
     ? '.'
     : nodeId.slice(0, -'/package.json'.length);
@@ -39,7 +39,7 @@ export function collectWorkspacePackageRoots(
   const packageRoots = new Set<string>();
 
   for (const node of nodes) {
-    if (!isFileNode(node) || !isPackageManifestPath(node.id)) {
+    if (!isFileNode(node) || !isWorkspacePackageManifestPath(node.id)) {
       continue;
     }
 

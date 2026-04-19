@@ -15,6 +15,7 @@ describe('pipeline/graph/packageSpecifiers/nodeId', () => {
   it('recognizes and labels external package node ids', () => {
     expect(isExternalPackageNodeId('pkg:react')).toBe(true);
     expect(isExternalPackageNodeId('src/app.ts')).toBe(false);
+    expect(isExternalPackageNodeId('pkg:workspace:packages/shared')).toBe(false);
     expect(getExternalPackageLabelFromNodeId('pkg:@scope/pkg')).toBe('@scope/pkg');
   });
 });

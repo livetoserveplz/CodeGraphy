@@ -1,4 +1,11 @@
 {
   "name": "@codegraphy/example-shared",
-  "private": true
+  "private": true,
+  "exports": {
+    ".": {
+      "types": "./src/types.ts",
+      "default": "./src/types.ts"
+    }
+  },
+  "types": "src/types.ts"
 }

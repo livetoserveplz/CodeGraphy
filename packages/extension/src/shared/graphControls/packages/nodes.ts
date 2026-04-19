@@ -1,12 +1,4 @@
-import { getWorkspacePackageNodeId } from './workspace';
-
-function getWorkspacePackageLabel(rootPath: string): string {
-  if (rootPath === '.') {
-    return 'workspace';
-  }
-
-  return rootPath.split('/').pop() ?? rootPath;
-}
+import { getWorkspacePackageLabel, getWorkspacePackageNodeId } from './workspace';
 
 export function createWorkspacePackageNodes(
   packageRoots: ReadonlySet<string>,
