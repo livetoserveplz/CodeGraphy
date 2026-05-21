@@ -97,6 +97,7 @@ export async function initializeWorkspacePipeline(
   if (workspaceRoot && settings) {
     const loadedPackagePlugins = await loadCodeGraphyWorkspacePluginPackages({
       settings,
+      workspaceRoot,
       ...(dependencies.userHomeDir ? { homeDir: dependencies.userHomeDir } : {}),
       ...(dependencies.warn ? { warn: dependencies.warn } : {}),
     });
@@ -104,6 +105,7 @@ export async function initializeWorkspacePipeline(
     for (const loadedPlugin of loadedPackagePlugins) {
       registry.register(loadedPlugin.plugin, {
         sourcePackage: loadedPlugin.packageName,
+        sourcePackageRoot: loadedPlugin.record.packageRoot,
         ...(loadedPlugin.options ? { options: loadedPlugin.options } : {}),
       });
     }

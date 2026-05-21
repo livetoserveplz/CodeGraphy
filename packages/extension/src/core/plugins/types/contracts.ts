@@ -11,6 +11,7 @@ export type {
   GraphMetadataValue,
   GraphNodeShape2D,
   GraphNodeShape3D,
+  IAccessProvider,
   IAnalysisFile,
   IAnalysisNode,
   IAnalysisRange,
@@ -22,6 +23,15 @@ export type {
   IGraphEdge,
   IGraphEdgeSource,
   IGraphNode,
+  IGraphViewContributions,
+  IGraphViewContextMenuContribution,
+  IGraphViewForceAdapterContribution,
+  IGraphViewNodeDragEndContribution,
+  IGraphViewNodeDragState,
+  IGraphViewProjectionContribution,
+  IGraphViewRuntimeEdgeContribution,
+  IGraphViewRuntimeNodeContribution,
+  IGraphViewUiSlotContribution,
   IPluginAnalysisContext,
   IPluginAnalysisFileSystem,
   IPluginEdgeType,
@@ -66,6 +76,8 @@ export interface IPluginInfo {
   sourceExtension?: string;
   /** Source npm package for package-installed plugins */
   sourcePackage?: string;
+  /** Root directory for package-installed plugin assets */
+  sourcePackageRoot?: string;
   /** Workspace-specific plugin options */
   options?: Record<string, unknown>;
 }

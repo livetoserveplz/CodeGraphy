@@ -42,6 +42,7 @@ function createGraphData(): UseGraphStateResult['graphData'] {
 				borderColor: '#1f2937',
 				borderWidth: 1,
 				color: '#93C5FD',
+				customRuntimeState: { owner: 'plugin-a' },
 				id: 'src/app.ts',
 				isFavorite: false,
 				isPinned: false,
@@ -183,7 +184,7 @@ function createCallbacks() {
 
 function createViewState(): Pick<
 	GraphViewStoreState,
-	'bidirectionalMode' | 'currentCommitSha' | 'dagMode' | 'depthMode' | 'directionMode' | 'favorites' | 'graphLayout' | 'graphMode' | 'nodeSizeMode' | 'particleSize' | 'particleSpeed' | 'physicsPaused' | 'physicsSettings' | 'pluginContextMenuItems' | 'setGraphMode' | 'showLabels' | 'timelineActive' | 'timelineCommits'
+	'bidirectionalMode' | 'currentCommitSha' | 'dagMode' | 'depthMode' | 'directionMode' | 'favorites' | 'graphMode' | 'graphViewContributionStatuses' | 'nodeSizeMode' | 'particleSize' | 'particleSpeed' | 'physicsPaused' | 'physicsSettings' | 'pluginContextMenuItems' | 'setGraphMode' | 'showLabels' | 'timelineActive' | 'timelineCommits'
 > {
 	const physicsSettings: IPhysicsSettings = {
 		centerForce: 0.1,
@@ -200,8 +201,8 @@ function createViewState(): Pick<
 		depthMode: false,
 		directionMode: 'arrows',
 		favorites: new Set(['src/app.ts']),
-		graphLayout: { collapsedNodes: {}, pinnedNodes: {}, sections: {}, ownership: {} },
 		graphMode: '3d',
+		graphViewContributionStatuses: [],
 		nodeSizeMode: 'connections',
 		particleSize: 3,
 		particleSpeed: 0.2,
@@ -262,16 +263,24 @@ describe('graph/viewport/shell', () => {
 	it('wires rendering runtime, viewport model, and the Viewport component', () => {
 		const graphData = createGraphData();
 		const graphState = createGraphState(graphData);
+		graphState.fg2dRef.current = {
+			graph2ScreenCoords: (x: number, y: number) => ({ x: x + 10, y: y + 20 }),
+			screen2GraphCoords: (x: number, y: number) => ({ x: x - 10, y: y - 20 }),
+			zoom: () => 1.75,
+		} as never;
 		const interactions = createInteractions();
 		const callbacks = createCallbacks();
 		const viewState = createViewState();
 		const handleEngineStop = vi.fn();
-		const pluginHost = { getOverlays: vi.fn() };
+		const pluginHost = {
+			getOverlays: vi.fn(),
+			setGraphViewViewportState: vi.fn(),
+		};
 
 		render(
 			<GraphViewportShell
 				callbacks={callbacks}
-				graphLayoutKey="connections::"
+				graphDataLayoutKey="connections::"
 				graphState={graphState}
 				handleEngineStop={handleEngineStop}
 				interactions={interactions}
@@ -291,8 +300,8 @@ describe('graph/viewport/shell', () => {
 			getLinkParticles: callbacks.getLinkParticles,
 			getParticleColor: callbacks.getParticleColor,
 			graphDataRef: graphState.graphDataRef,
-			graphLayout: viewState.graphLayout,
-			graphLayoutKey: 'connections::',
+			graphDataLayoutKey: 'connections::',
+			graphViewContributions: undefined,
 			graphMode: '3d',
 			meshesRef: graphState.meshesRef,
 			nodeSizeMode: 'connections',
@@ -306,6 +315,7 @@ describe('graph/viewport/shell', () => {
 			spritesRef: graphState.spritesRef,
 			theme: 'light',
 			favorites: viewState.favorites,
+			timelineActive: true,
 			directionMode: 'arrows',
 		}));
 		expect(harness.useGraphViewportModel).toHaveBeenCalledWith(expect.objectContaining({
@@ -356,86 +366,93 @@ describe('graph/viewport/shell', () => {
 			}),
 			tooltipData: interactions.tooltipData,
 		}));
+
+		const viewportProps = harness.viewport.mock.calls.at(-1)?.[0] as {
+			surface2dProps: {
+				onRenderFramePost(ctx: CanvasRenderingContext2D, globalScale: number): void;
+			};
+		};
+		viewportProps.surface2dProps.onRenderFramePost({} as CanvasRenderingContext2D, 2);
+		expect(pluginHost.setGraphViewViewportState).toHaveBeenCalledWith(expect.objectContaining({
+			graphMode: '3d',
+			nodes: expect.arrayContaining([
+				expect.objectContaining({
+					customRuntimeState: { owner: 'plugin-a' },
+					id: 'src/app.ts',
+				}),
+			]),
+			timelineActive: true,
+			zoom: 1.75,
+		}));
 	});
 
-	it('posts section ownership updates after an expanded Section Frame is dragged into another section', () => {
+	it('publishes mutable viewport controls for plugin-owned world overlays', () => {
 		const graphData = createGraphData();
 		const graphState = createGraphState(graphData);
-		graphState.graphDataRef.current.nodes = [
-			{
-				id: 'section-1',
-				isGraphSection: true,
-				sectionHeight: 300,
-				sectionWidth: 300,
-				x: 150,
-				y: 150,
-			},
-			{
-				id: 'section-2',
-				isGraphSection: true,
-				sectionHeight: 120,
-				sectionWidth: 120,
-				x: 120,
-				y: 120,
-			},
-		] as never;
-		const viewState = createViewState();
-		viewState.graphMode = '2d';
-		viewState.timelineActive = false;
-		viewState.graphLayout = {
-			collapsedNodes: {},
-			pinnedNodes: {},
-			sections: {
-				'section-1': {
-					id: 'section-1',
-					label: 'Parent',
-					color: '#60a5fa',
-					x: 0,
-					y: 0,
-					width: 300,
-					height: 300,
-					collapsed: false,
-					updatedAt: '2026-05-13T09:30:00.000Z',
-				},
-				'section-2': {
-					id: 'section-2',
-					label: 'Child',
-					color: '#22c55e',
-					x: 420,
-					y: 0,
-					width: 120,
-					height: 120,
-					collapsed: false,
-					updatedAt: '2026-05-13T09:30:00.000Z',
-				},
-			},
-			ownership: {},
+		const reheatSimulation = vi.fn();
+		const resumeAnimation = vi.fn();
+		graphState.fg2dRef.current = {
+			d3ReheatSimulation: reheatSimulation,
+			graph2ScreenCoords: (x: number, y: number) => ({ x, y }),
+			resumeAnimation,
+			screen2GraphCoords: (x: number, y: number) => ({ x, y }),
+			zoom: () => 1,
+		} as never;
+		const interactions = createInteractions();
+		const callbacks = createCallbacks();
+		const viewState = { ...createViewState(), graphMode: '2d' as const };
+		const pluginHost = {
+			getOverlays: vi.fn(),
+			setGraphViewViewportState: vi.fn(),
 		};
 
 		render(
 			<GraphViewportShell
-				callbacks={createCallbacks()}
-				graphLayoutKey="connections::"
+				callbacks={callbacks}
+				graphDataLayoutKey="connections::"
 				graphState={graphState}
 				handleEngineStop={vi.fn()}
-				interactions={createInteractions()}
+				interactions={interactions}
+				pluginHost={pluginHost as never}
 				theme="light"
 				viewState={viewState}
 			/>,
 		);
 
-		const viewportProps = harness.viewport.mock.calls[0]?.[0] as {
-			onSectionDragEnd(sectionId: string): void;
+		const viewportProps = harness.viewport.mock.calls.at(-1)?.[0] as {
+			surface2dProps: {
+				onRenderFramePost(ctx: CanvasRenderingContext2D, globalScale: number): void;
+			};
 		};
-		viewportProps.onSectionDragEnd('section-2');
+		viewportProps.surface2dProps.onRenderFramePost({} as CanvasRenderingContext2D, 1);
+		const viewportState = pluginHost.setGraphViewViewportState.mock.calls.at(-1)?.[0] as {
+			reheatSimulation(): void;
+			resumeAnimation(): void;
+			updateNode(nodeId: string, updates: Record<string, unknown>): boolean;
+		};
 
-		expect(harness.postMessage).toHaveBeenCalledWith({
-			type: 'UPDATE_GRAPH_LAYOUT_OWNER',
-			payload: {
-				itemId: 'section-2',
-				itemKind: 'section',
-				ownerSectionId: 'section-1',
-			},
+		expect(viewportState.updateNode('src/app.ts', {
+			fx: 42,
+			fy: 24,
+			sectionHeight: 144,
+			sectionWidth: 288,
+			x: 42,
+			y: 24,
+		})).toBe(true);
+		expect(graphState.graphDataRef.current.nodes[0]).toMatchObject({
+			fx: 42,
+			fy: 24,
+			sectionHeight: 144,
+			sectionWidth: 288,
+			x: 42,
+			y: 24,
 		});
+		expect(viewportState.updateNode('missing.ts', { x: 1 })).toBe(false);
+
+		viewportState.resumeAnimation();
+		viewportState.reheatSimulation();
+		expect(resumeAnimation).toHaveBeenCalledOnce();
+		expect(reheatSimulation).toHaveBeenCalledOnce();
 	});
+
 });

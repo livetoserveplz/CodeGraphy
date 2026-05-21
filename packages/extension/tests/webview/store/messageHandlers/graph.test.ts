@@ -11,7 +11,6 @@ import {
   handleGraphDataUpdated,
   handleGraphIndexProgress,
   handleGraphIndexStatusUpdated,
-  handleGraphLayoutUpdated,
   handleLegendsUpdated,
   handleMaxFilesUpdated,
   handlePhysicsSettingsUpdated,
@@ -70,6 +69,7 @@ function createState(
     pluginContextMenuItems: [],
     pluginExporters: [],
     pluginToolbarActions: [],
+    graphViewContributionStatuses: [],
     activePanel: 'none',
     maxFiles: 500,
     activeFilePath: null,
@@ -80,12 +80,6 @@ function createState(
     indexProgress: null,
     isPlaying: false,
     playbackSpeed: 1,
-    graphLayout: {
-      collapsedNodes: {},
-      pinnedNodes: {},
-      sections: {},
-      ownership: {},
-    },
     ...overrides,
   };
 }
@@ -151,21 +145,6 @@ describe('webview/store/messageHandlers/graph', () => {
     });
     expect([...favorites.favorites ?? []]).toEqual(['src/app.ts', 'src/lib.ts']);
 
-    const graphLayout = {
-      collapsedNodes: {},
-      pinnedNodes: {
-        'src/app.ts': {
-          nodeId: 'src/app.ts',
-          '2D': { x: 12, y: 24 },
-        },
-      },
-      sections: {},
-      ownership: {},
-    };
-    expect(handleGraphLayoutUpdated({
-      type: 'GRAPH_LAYOUT_UPDATED',
-      payload: graphLayout,
-    })).toEqual({ graphLayout });
   });
 
   it('maps settings and filter payloads', () => {

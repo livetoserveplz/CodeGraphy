@@ -1,5 +1,4 @@
 import { isPlainObject } from './plainObject';
-import { normalizeGraphLayoutSettings } from '../../graphLayout/model';
 import { pruneGraphControlConfigMap, type GraphControlConfigKey } from '../../../../shared/graphControls/settings';
 
 const TOP_LEVEL_SETTINGS_KEYS = new Set([
@@ -9,6 +8,7 @@ const TOP_LEVEL_SETTINGS_KEYS = new Set([
   'respectGitignore',
   'showOrphans',
   'plugins',
+  'pluginData',
   'nodeColors',
   'nodeVisibility',
   'edgeVisibility',
@@ -31,7 +31,6 @@ const TOP_LEVEL_SETTINGS_KEYS = new Set([
   'nodeSizeMode',
   'physics',
   'timeline',
-  'graphLayout',
 ]);
 
 const PHYSICS_SETTINGS_KEYS = new Set([
@@ -180,15 +179,19 @@ function normalizePersistedPlugins(normalized: Record<string, unknown>): void {
   normalized.plugins = plugins;
 }
 
-function normalizePersistedLegend(normalized: Record<string, unknown>): void {
-  if ('legend' in normalized) {
-    normalized.legend = normalizePersistedLegendRules(normalized.legend);
+function normalizePersistedPluginData(normalized: Record<string, unknown>): void {
+  if (!('pluginData' in normalized)) {
+    return;
+  }
+
+  if (!isPlainObject(normalized.pluginData)) {
+    delete normalized.pluginData;
   }
 }
 
-function normalizePersistedGraphLayout(normalized: Record<string, unknown>): void {
-  if ('graphLayout' in normalized) {
-    normalized.graphLayout = normalizeGraphLayoutSettings(normalized.graphLayout);
+function normalizePersistedLegend(normalized: Record<string, unknown>): void {
+  if ('legend' in normalized) {
+    normalized.legend = normalizePersistedLegendRules(normalized.legend);
   }
 }
 
@@ -218,9 +221,9 @@ export function normalizePersistedSettingsShape(
 
   const normalized = pickTopLevelSettings(value);
   normalizePersistedPlugins(normalized);
+  normalizePersistedPluginData(normalized);
   normalizePersistedFilterPatterns(normalized);
   normalizePersistedLegend(normalized);
-  normalizePersistedGraphLayout(normalized);
   normalizePersistedGraphControls(normalized);
   return normalized;
 }

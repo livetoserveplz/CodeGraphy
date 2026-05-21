@@ -43,6 +43,7 @@ Installation and enablement are separate:
 - `npm i -g @codegraphy/plugin-python` installs a plugin package for the developer's toolchain.
 - `codegraphy plugins refresh` records installed `@codegraphy/*` plugin packages in `~/.codegraphy/plugins.json`.
 - `codegraphy plugins add <package>` records an explicitly named globally installed plugin package, including private or non-`@codegraphy` packages.
+- `codegraphy plugins link <package-root>` records a local package checkout directly in `~/.codegraphy/plugins.json`, which is the preferred local-development path for private plugins.
 - `codegraphy plugins enable <package> [workspace]` writes that plugin into the workspace-local `plugins` array.
 - `codegraphy plugins disable <package> [workspace]` removes that plugin from the workspace-local enabled set.
 - Enabling and disabling plugins do not run Indexing automatically; run `codegraphy index [workspace]` to refresh the Graph Cache.
@@ -74,9 +75,44 @@ Plugin packages declare CodeGraphy metadata in `package.json` so discovery can v
 }
 ```
 
-The npm package's normal `exports` field owns runtime import behavior. The `codegraphy` block is for identity, Plugin API compatibility, optional default options, and optional capability disclosures. Plugin runtime loading happens during explicit Indexing, not during install, refresh, list, enable, or disable commands.
+The npm package's normal `exports` field owns runtime import behavior. The `codegraphy` block is for identity, Plugin API compatibility, optional default options, and optional capability disclosures. Plugin runtime loading happens during explicit Indexing, not during install, refresh, list, enable, disable, or link commands.
 
-When Indexing loads an enabled package, `@codegraphy/core` merges `codegraphy.defaultOptions` from the package manifest with the workspace entry's `options` object. Workspace options win. The merged object is passed to `initialize`, `onPreAnalyze`, `onFilesChanged`, and `analyzeFile` as `context.options`, so the same plugin package can run with different settings in different CodeGraphy Workspaces.
+For local private plugin development, keep the private source outside this public monorepo and link its package root:
+
+```bash
+codegraphy plugins link ~/src/acme-graph-tools
+codegraphy plugins enable @acme/graph-tools /path/to/indexed-folder
+codegraphy index /path/to/indexed-folder
+```
+
+When testing through F5, launch only the public CodeGraphy VS Code extension. Do not add headless plugin package folders to VS Code's `extensionDevelopmentPath`; the extension host loads linked packages from `~/.codegraphy/plugins.json` and the opened workspace's `.codegraphy/settings.json`.
+
+The Plugins panel is a package toggle surface. It shows package-backed plugins that can be enabled, disabled, and reordered for the current CodeGraphy Workspace. Core runtime internals such as Tree-sitter, and legacy VS Code extension plugin entries without a package backing, are not shown as plugin toggle rows.
+
+Disabling a package removes it from the workspace `plugins` array and reloads Graph View contributions. Package-owned persisted data may remain on disk, but its Graph View nodes, forces, context menu entries, toolbar create entries, webview injections, and UI slots only render while that package is enabled and loaded. The Graph View host broadcasts the refreshed plugin status and contribution state immediately after a package toggle, before the follow-up graph analysis finishes.
+
+When Indexing loads an enabled package, `@codegraphy/core` merges `codegraphy.defaultOptions` from the package manifest with the workspace entry's `options` object. Workspace options win. The merged object is passed to package plugin factories as `factoryOptions.options`, and to `initialize`, `onPreAnalyze`, `onFilesChanged`, and `analyzeFile` as `context.options`, so the same plugin package can run with different settings in different CodeGraphy Workspaces.
+
+Package factories also receive a workspace-scoped `factoryOptions.dataHost` when the package is loaded for a concrete CodeGraphy Workspace:
+
+```ts
+import type { IPluginFactory } from '@codegraphy/plugin-api';
+
+const createPlugin: IPluginFactory = ({ dataHost, options } = {}) => ({
+  id: 'acme.graph-tools',
+  name: 'Acme Graph Tools',
+  version: '1.0.0',
+  apiVersion: '^2.0.0',
+  supportedExtensions: [],
+  async initialize() {
+    await dataHost?.saveData({ mode: options?.mode ?? 'default' });
+  },
+});
+
+export default createPlugin;
+```
+
+The data host persists under the plugin id returned by the factory, not under the npm package name. Use it from lifecycle hooks, analysis hooks, and Graph View contributions after the factory returns.
 
 Default options are copied into workspace settings when the plugin is enabled so the user can see and edit the starting values for that workspace. For example, enabling a Godot plugin whose package manifest contains:
 

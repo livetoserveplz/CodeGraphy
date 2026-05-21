@@ -28,11 +28,9 @@ import { useGraphMarqueeSelectionRuntime } from './marquee/hook';
 import {
   applyNodeDrag,
   postDraggedNodesDragEndMessages,
-  updateNodeDragOwnerPreview,
   type NodeDragGroupSession,
   type NodeDragTranslate,
 } from './nodeDrag';
-import { createGraphNodePositionMap } from './positions';
 import { useGraphViewportPanRuntime } from './viewportPan/hook';
 
 function buildTooltipInteractionHandlers(
@@ -73,7 +71,7 @@ export function useGraphInteractionRuntime({
   graphContextSelection,
   graphCursorRef,
   graphDataRef,
-  graphLayout,
+  graphViewContributions,
   graphMode,
   highlightedNeighborsRef,
   highlightedNodeRef,
@@ -109,7 +107,6 @@ export function useGraphInteractionRuntime({
       fg2dRef: refs.fg2dRef,
       fg3dRef: refs.fg3dRef,
       fileInfoCacheRef,
-      graphLayout,
       graphCursorRef,
       graphDataRef,
       graphMode,
@@ -123,16 +120,12 @@ export function useGraphInteractionRuntime({
       setContextSelection: setLiveContextSelection,
       setHighlightVersion,
       setSelectedNodes,
-      toggleFolderCollapse: (nodeId, collapsed) => {
-        postMessage({ type: 'UPDATE_GRAPH_LAYOUT_COLLAPSE', payload: { nodeId, collapsed } });
-      },
     }),
     [
       dataRef,
       depthMode,
       fileInfoCacheRef,
       graphCursorRef,
-      graphLayout,
       graphDataRef,
       graphMode,
       highlightedNeighborsRef,
@@ -187,19 +180,16 @@ export function useGraphInteractionRuntime({
 
   const getActionContext = useCallback(
     () => resolveGraphContextActionContext(graphContextSelectionRef.current, {
-      graphLayout,
-      graphMode,
       graphViewportScale: readGraphViewportScale(graphMode, refs.fg2dRef.current),
       nodes: graphDataRef.current.nodes,
-      nodePositions: createGraphNodePositionMap(graphDataRef.current.nodes, graphMode),
     }),
-    [graphDataRef, graphLayout, graphMode, refs.fg2dRef],
+    [graphDataRef, graphMode, refs.fg2dRef],
   );
 
   function handleNodeDragEnd(node: FGNode): void {
     postDraggedNodesDragEndMessages(node, nodeDragGroupRef.current, {
       graphData: graphDataRef.current,
-      graphLayout,
+      graphViewContributions,
       graphMode,
       timelineActive,
     });
@@ -212,20 +202,6 @@ export function useGraphInteractionRuntime({
       graphMode,
       selectedNodeIds: refs.selectedNodesSetRef.current,
     }, nodeDragGroupRef.current);
-
-    const draggedNodeIds = nodeDragGroupRef.current?.draggedNodeIds ?? new Set([node.id]);
-    const nodesById = new Map(graphDataRef.current.nodes.map(graphNode => [graphNode.id, graphNode]));
-    for (const nodeId of draggedNodeIds) {
-      const draggedNode = nodeId === node.id ? node : nodesById.get(nodeId);
-      if (draggedNode) {
-        updateNodeDragOwnerPreview(draggedNode, {
-          graphData: graphDataRef.current,
-          graphLayout,
-          graphMode,
-          timelineActive,
-        });
-      }
-    }
 
     marqueeRuntime.clearMarqueeSelection();
   }

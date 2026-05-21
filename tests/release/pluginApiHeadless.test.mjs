@@ -19,10 +19,18 @@ function listFilesIfPresent(relativePath) {
     .map((entry) => entry.name);
 }
 
-test('plugin API package publishes only headless plugin contracts', () => {
+test('plugin API package publishes explicit headless and webview plugin contracts', () => {
   const manifest = JSON.parse(readPluginApiFile('package.json'));
 
-  assert.deepEqual(Object.keys(manifest.exports), ['.', './events', './plugin']);
+  assert.deepEqual(Object.keys(manifest.exports), [
+    '.',
+    './events',
+    './plugin',
+    './access',
+    './data',
+    './graph-view',
+    './webview',
+  ]);
   assert.deepEqual(listFilesIfPresent('src/webview'), []);
 
   const indexSource = readPluginApiFile('src/index.ts');
@@ -30,11 +38,6 @@ test('plugin API package publishes only headless plugin contracts', () => {
 
   for (const forbidden of [
     'CodeGraphyAPI',
-    'CodeGraphyWebviewAPI',
-    'webviewApiVersion',
-    'webviewContributions',
-    'onLoad',
-    'onWebviewReady',
     'NodeDecoration',
     'EdgeDecoration',
     'IView',

@@ -1,11 +1,7 @@
-import { useRef, type ReactElement } from 'react';
+import { useEffect, useRef, type ReactElement } from 'react';
+import type { GraphViewViewportNode } from '../../../pluginHost/api/contracts/webview';
+import type { CoreGraphViewContributionSet } from '@codegraphy/core';
 import type { ThemeKind } from '../../../theme/useTheme';
-import type { LegendIconImport } from '../../../../shared/protocol/webviewToExtension';
-import {
-  getGraphLayoutPinCoordinate,
-  type GraphLayoutSection,
-  type GraphLayoutSectionUpdate,
-} from '../../../../shared/settings/graphLayout';
 import type { GraphAppearance } from '../appearance/model';
 import type { WebviewPluginHost } from '../../../pluginHost/manager';
 import type { GraphViewStoreState } from '../view/store';
@@ -13,21 +9,26 @@ import type { UseGraphCallbacksResult } from '../rendering/useGraphCallbacks';
 import type { UseGraphInteractionRuntimeResult } from '../runtime/use/interaction';
 import type { UseGraphRenderingRuntimeResult } from '../runtime/use/rendering';
 import type { UseGraphStateResult } from '../runtime/use/state';
-import type { FGNode } from '../model/build';
-import type { SectionFrameNodePosition } from '../sectionFrames/model';
 import { useGraphRenderingRuntime } from '../runtime/use/rendering';
 import { useGraphEventEffects } from '../runtime/use/events/effects';
-import { postNodeDragEndMessages } from '../runtime/use/interaction/nodeDrag';
 import { Viewport } from './view';
 import { useGraphViewportModel } from './model';
-import { postMessage } from '../../../vscodeApi';
 import { graphStore } from '../../../store/state';
+
+interface GraphViewport2dControls {
+  d3ReheatSimulation?(): void;
+  graph2ScreenCoords?(x: number, y: number): { x: number; y: number };
+  resumeAnimation?(): void;
+  screen2GraphCoords?(x: number, y: number): { x: number; y: number };
+  zoom?(): number;
+}
 
 export interface GraphViewportShellProps {
   appearance?: GraphAppearance;
   callbacks: UseGraphCallbacksResult;
-  graphLayoutKey: string;
+  graphDataLayoutKey: string;
   graphState: UseGraphStateResult;
+  graphViewContributions?: CoreGraphViewContributionSet;
   handleEngineStop(this: void): void;
   interactions: UseGraphInteractionRuntimeResult;
   pluginHost?: WebviewPluginHost;
@@ -38,12 +39,13 @@ export interface GraphViewportShellProps {
 function buildRenderingRuntimeOptions({
   appearance,
   callbacks,
-  graphLayoutKey,
+  graphDataLayoutKey,
   graphState,
+  graphViewContributions,
   pluginHost,
   theme,
   viewState,
-}: Pick<GraphViewportShellProps, 'appearance' | 'callbacks' | 'graphLayoutKey' | 'graphState' | 'pluginHost' | 'theme' | 'viewState'>) {
+}: Pick<GraphViewportShellProps, 'appearance' | 'callbacks' | 'graphDataLayoutKey' | 'graphState' | 'graphViewContributions' | 'pluginHost' | 'theme' | 'viewState'>) {
   return {
     appearance,
     containerRef: graphState.containerRef,
@@ -55,8 +57,8 @@ function buildRenderingRuntimeOptions({
     getLinkParticles: callbacks.getLinkParticles,
     getParticleColor: callbacks.getParticleColor,
     graphDataRef: graphState.graphDataRef,
-    graphLayout: viewState.graphLayout,
-    graphLayoutKey,
+    graphViewContributions,
+    graphDataLayoutKey,
     graphMode: viewState.graphMode,
     highlightVersion: graphState.highlightVersion,
     highlightedNeighborsRef: graphState.highlightedNeighborsRef,
@@ -72,6 +74,7 @@ function buildRenderingRuntimeOptions({
     showLabels: viewState.showLabels,
     spritesRef: graphState.spritesRef,
     theme,
+    timelineActive: viewState.timelineActive,
     favorites: viewState.favorites,
     directionMode: viewState.directionMode,
   };
@@ -80,6 +83,7 @@ function buildRenderingRuntimeOptions({
 function useGraphViewportModelOptions({
   appearance,
   graphState,
+  graphViewContributions,
   interactions,
   handleEngineStop,
   viewportRuntime,
@@ -87,6 +91,7 @@ function useGraphViewportModelOptions({
 }: {
   appearance?: GraphAppearance;
   graphState: UseGraphStateResult;
+  graphViewContributions?: CoreGraphViewContributionSet;
   interactions: UseGraphInteractionRuntimeResult;
   handleEngineStop(this: void): void;
   viewportRuntime: Pick<UseGraphRenderingRuntimeResult, 'containerSize' | 'renderPluginOverlays'>;
@@ -97,42 +102,13 @@ function useGraphViewportModelOptions({
       contextSelection: graphState.contextSelection,
       graphData: graphState.graphData,
     },
+    graphViewContributions,
     handleEngineStop,
     appearance,
     interactions,
     viewportRuntime,
     viewState,
   });
-}
-
-function getPinnedSectionIds(
-  sections: readonly GraphLayoutSection[],
-  pinnedNodes: GraphViewStoreState['graphLayout']['pinnedNodes'],
-): Set<string> {
-  const pinnedSectionIds = new Set<string>();
-  for (const section of sections) {
-    if (getGraphLayoutPinCoordinate(pinnedNodes[section.id], '2d')) {
-      pinnedSectionIds.add(section.id);
-    }
-  }
-
-  return pinnedSectionIds;
-}
-
-function getSectionFrameNodePositions(
-  nodes: readonly FGNode[],
-): Map<string, SectionFrameNodePosition> {
-  const positions = new Map<string, SectionFrameNodePosition>();
-
-  for (const node of nodes) {
-    if (!node.isGraphSection || node.isCollapsedGraphSection) {
-      continue;
-    }
-
-    positions.set(node.id, node);
-  }
-
-  return positions;
 }
 
 function shouldPublishGraphViewportScale(
@@ -142,11 +118,57 @@ function shouldPublishGraphViewportScale(
   return previous === null || Math.abs(previous - next) >= 0.01;
 }
 
+function readViewportBoolean(value: unknown): boolean | undefined {
+  return typeof value === 'boolean' ? value : undefined;
+}
+
+function readViewportNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function toGraphViewViewportNodes(nodes: UseGraphStateResult['graphData']['nodes']): GraphViewViewportNode[] {
+  return nodes.map(node => {
+    const viewportNode = node as GraphViewViewportNode;
+
+    return {
+      ...viewportNode,
+      fx: readViewportNumber(node.fx),
+      fy: readViewportNumber(node.fy),
+      fz: readViewportNumber(node.fz),
+      id: node.id,
+      isDragging: readViewportBoolean(node.isDragging),
+      isPinned: readViewportBoolean(node.isPinned),
+      size: readViewportNumber(node.size),
+      vx: readViewportNumber(node.vx),
+      vy: readViewportNumber(node.vy),
+      vz: readViewportNumber(node.vz),
+      x: readViewportNumber(node.x),
+      y: readViewportNumber(node.y),
+      z: readViewportNumber(node.z),
+    };
+  });
+}
+
+function updateGraphViewViewportNode(
+  nodes: UseGraphStateResult['graphData']['nodes'],
+  nodeId: string,
+  updates: Record<string, unknown>,
+): boolean {
+  const node = nodes.find(candidate => candidate.id === nodeId);
+  if (!node) {
+    return false;
+  }
+
+  Object.assign(node, updates);
+  return true;
+}
+
 export function GraphViewportShell({
   appearance,
   callbacks,
-  graphLayoutKey,
+  graphDataLayoutKey,
   graphState,
+  graphViewContributions,
   handleEngineStop,
   interactions,
   pluginHost,
@@ -157,8 +179,9 @@ export function GraphViewportShell({
   const viewportRuntime = useGraphRenderingRuntime(buildRenderingRuntimeOptions({
     appearance,
     callbacks,
-    graphLayoutKey,
+    graphDataLayoutKey,
     graphState,
+    graphViewContributions,
     pluginHost,
     theme,
     viewState,
@@ -183,45 +206,13 @@ export function GraphViewportShell({
   const viewportModel = useGraphViewportModelOptions({
     appearance,
     graphState,
+    graphViewContributions,
     handleEngineStop,
     interactions,
     viewportRuntime,
     viewState,
   });
 
-  function handleUpdateSection(
-    sectionId: string,
-    updates: GraphLayoutSectionUpdate,
-    iconImports?: LegendIconImport[],
-  ): void {
-    postMessage({
-      type: 'UPDATE_GRAPH_LAYOUT_SECTION',
-      payload: iconImports?.length
-        ? { sectionId, updates, iconImports }
-        : { sectionId, updates },
-    });
-  }
-
-  function handleSectionDragEnd(sectionId: string): void {
-    const node = graphState.graphDataRef.current.nodes.find(candidate => candidate.id === sectionId);
-    if (!node) {
-      return;
-    }
-
-    postNodeDragEndMessages(
-      node,
-      viewState.graphLayout,
-      viewState.graphMode,
-      viewState.timelineActive,
-      graphState.graphDataRef.current.nodes,
-    );
-  }
-
-  const sectionFrames = viewState.graphMode === '2d' && !viewState.timelineActive
-    ? Object.values(viewState.graphLayout.sections)
-    : [];
-  const pinnedSectionIds = getPinnedSectionIds(sectionFrames, viewState.graphLayout.pinnedNodes);
-  const sectionFrameNodePositions = getSectionFrameNodePositions(graphState.graphData.nodes);
   const publishGraphViewportScale = (globalScale: number): void => {
     if (viewState.graphMode !== '2d' || !Number.isFinite(globalScale) || globalScale <= 0) {
       return;
@@ -234,6 +225,32 @@ export function GraphViewportShell({
     lastPublishedViewportScaleRef.current = globalScale;
     graphStore.getState().setGraphViewportScale(globalScale);
   };
+
+  const publishGraphViewViewportState = (globalScale: number): void => {
+    if (!pluginHost) {
+      return;
+    }
+
+    const graph = graphState.fg2dRef.current as GraphViewport2dControls | undefined;
+    pluginHost.setGraphViewViewportState({
+      graphMode: viewState.graphMode,
+      graphToScreen: (x, y) => graph?.graph2ScreenCoords?.(x, y) ?? { x, y },
+      nodes: toGraphViewViewportNodes(graphState.graphDataRef.current.nodes),
+      reheatSimulation: () => graph?.d3ReheatSimulation?.(),
+      resumeAnimation: () => graph?.resumeAnimation?.(),
+      screenToGraph: (x, y) => graph?.screen2GraphCoords?.(x, y) ?? { x, y },
+      timelineActive: viewState.timelineActive,
+      updateNode: (nodeId, updates) =>
+        updateGraphViewViewportNode(graphState.graphDataRef.current.nodes, nodeId, updates),
+      zoom: graph?.zoom?.() ?? globalScale,
+    });
+  };
+
+  useEffect(() => {
+    return () => {
+      pluginHost?.setGraphViewViewportState(null);
+    };
+  }, [pluginHost]);
 
   return (
     <Viewport
@@ -251,16 +268,6 @@ export function GraphViewportShell({
       handleMouseUpCapture={interactions.handleMouseUpCapture}
       menuEntries={viewportModel.menuEntries}
       marqueeSelection={interactions.marqueeSelection}
-      sectionFrameGraph={graphState.fg2dRef.current}
-      sectionFrameOwnership={viewState.graphLayout.ownership}
-      sectionNodePositions={sectionFrameNodePositions}
-      pinnedSectionIds={pinnedSectionIds}
-      sectionFrames={sectionFrames}
-      onOpenSectionContextMenu={(sectionId, event) => {
-        interactions.handleNodeContextMenuById(sectionId, event.nativeEvent);
-      }}
-      onSectionDragEnd={handleSectionDragEnd}
-      onUpdateSection={handleUpdateSection}
       surface2dProps={{
         fg2dRef: graphState.fg2dRef,
         getArrowColor: callbacks.getArrowColor,
@@ -274,6 +281,7 @@ export function GraphViewportShell({
         nodePointerAreaPaint: callbacks.nodePointerAreaPaint,
         onRenderFramePost: (ctx, globalScale) => {
           publishGraphViewportScale(globalScale);
+          publishGraphViewViewportState(globalScale);
           viewportRuntime.renderPluginOverlays(ctx, globalScale);
         },
         particleSize: viewState.particleSize,

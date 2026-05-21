@@ -103,6 +103,47 @@ describe('plugins/command', () => {
     ]);
   });
 
+  it('links a private local plugin package without requiring global npm install', async () => {
+    const homeDir = await fs.mkdtemp(path.join(os.tmpdir(), 'codegraphy-user-home-'));
+    const packageRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'codegraphy-private-package-'));
+    const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'codegraphy-workspace-'));
+    await fs.writeFile(
+      path.join(packageRoot, 'package.json'),
+      `${JSON.stringify({
+        name: '@acme/codegraphy-private-plugin',
+        version: '0.1.0',
+        codegraphy: {
+          type: 'plugin',
+          apiVersion: '^2.0.0',
+        },
+      }, null, 2)}\n`,
+      'utf-8',
+    );
+
+    const result = await runPluginsCommand({
+      name: 'plugins',
+      action: 'link',
+      packageRoot,
+    }, {
+      cwd: () => workspaceRoot,
+      homeDir,
+    });
+
+    expect(result).toEqual({
+      exitCode: 0,
+      output: `Linked @acme/codegraphy-private-plugin from ${packageRoot} into ~/.codegraphy/plugins.json.`,
+    });
+    expect(readCodeGraphyInstalledPluginCache({ homeDir }).plugins).toEqual([
+      expect.objectContaining({
+        package: '@acme/codegraphy-private-plugin',
+        packageRoot,
+      }),
+    ]);
+    await expect(fs.stat(path.join(workspaceRoot, '.codegraphy', 'settings.json'))).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+  });
+
   it('enables and disables a cached plugin for one workspace', async () => {
     const homeDir = await fs.mkdtemp(path.join(os.tmpdir(), 'codegraphy-user-home-'));
     const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'codegraphy-workspace-plugin-'));
